@@ -1,3 +1,2 @@
 # Remade-Lua
-lua functions recreated in order to use them instead of addresses.
-well now you have to use em cause roblox inlined functions lo
+during 4th August 2021, Roblox decided to use __inline on their lua functions which has destroyed the usage of the addresses, this repo is simply made so those inlined functions are remade and is ready to work
