@@ -25,6 +25,12 @@ void r_lua_pushnumber(std::uintptr_t rL, std::double_t num)
 	r_incr_top(rL);
 }
 
+void r_lua_pushvalue(std::uintptr_t rL, std::uint32_t idx)
+{
+        r_setobj2s(*reinterpret_cast<r_TValue**>(rL + offsets::top), r_index2adr(rL, idx));
+        r_incr_top(rL);
+}
+
 void r_lua_pushinteger(std::uintptr_t rL, std::uint32_t n)
 {
 	r_setnvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), cast_num(n));
