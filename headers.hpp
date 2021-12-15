@@ -152,6 +152,8 @@ typedef struct r_lua_TValue
 
 #define r_obj2gco(v)	(cast(r_GCObject *, (v)))
 
+#define r_G(v7) (*(DWORD*)(v7 + offsets::l_G) - (v7 + offsets::l_G)) // THIS CHANGES EVERY UPDATE
+
 namespace offsets
 {
 	/* OFFSETS */
