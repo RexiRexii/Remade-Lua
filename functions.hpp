@@ -66,7 +66,7 @@ std::uint32_t r_lua_tointeger(std::uintptr_t rL, std::uint32_t idx)
 	r_TValue* top = r_index2adr(rL, idx);
 
 	const std::double_t raw_value = *reinterpret_cast<std::double_t*>(&(reinterpret_cast<r_TValue*>(top))->value);
-	const auto result = static_cast<signed int>(floor(r_xor_number(raw_value)));
+	const auto result = static_cast<std::int32_t>(floor(r_xor_number(raw_value)));
 	return result;
 }
 
@@ -95,6 +95,123 @@ const void* r_lua_topointer(std::uintptr_t rL, std::uint32_t idx)
 	}
 }
 
+/* state -> other */
+void r_lua_xmove(std::uintptr_t from, std::uintptr_t to, std::uint32_t n)
+{
+	if (from == to) return;
+	*reinterpret_cast<std::uintptr_t*>(from + offsets::top) -= (n * sizeof(r_TValue));
+
+	for (auto i = 0; i < n; i++)
+	{
+		r_setobj2s(*reinterpret_cast<r_TValue**>(to + offsets::top), *reinterpret_cast<r_TValue**>(from + offsets::top) + i);
+		r_incr_top(to);
+	}
+	return;
+}
+
+void r_lua_replace(std::uintptr_t rL, std::uint32_t idx)
+{
+	auto o = r_index2adr(rL, idx);
+
+	if (idx == R_LUA_ENVIRONINDEX)
+	{
+	//	r_luaL_error(rL, "no calling environment");
+		printf("no calling environment\n"); // use r_luaL_error if you want
+	}
+
+	r_setobj2s(reinterpret_cast<r_TValue*>(o), reinterpret_cast<r_TValue*>(r_index2adr(rL, -1)));
+	r_decr_top(rL);
+}
+
+void r_lua_remove(std::uintptr_t rL, std::uint32_t idx)
+{
+	auto p = r_index2adr(rL, idx);
+
+	while (p < *reinterpret_cast<r_TValue**>(rL + offsets::top))
+	{
+		r_setobj2s(reinterpret_cast<r_TValue*>(p), reinterpret_cast<r_TValue*>(p + sizeof(r_TValue)));
+		p += sizeof(r_TValue);
+	}
+
+	r_decr_top(rL);
+}
+
+void r_lua_insert(std::uintptr_t rL, std::uint32_t idx)
+{
+	auto p = r_index2adr(rL, idx);
+	for (auto q = *reinterpret_cast<r_TValue**>(rL + offsets::top); q > p; q -= sizeof(r_TValue))
+	{
+		r_setobj2s(reinterpret_cast<r_TValue*>(q), reinterpret_cast<r_TValue*>(q - sizeof(r_TValue)));
+	}
+
+	r_setobj2s(reinterpret_cast<r_TValue*>(p), *reinterpret_cast<r_TValue**>(rL + offsets::top));
+}
+
+std::uint32_t r_lua_gettop(std::uintptr_t rL)
+{
+	return cast_int(*reinterpret_cast<r_TValue**>(rL + offsets::top) - *reinterpret_cast<r_TValue**>(rL + offsets::base));
+}
+
+void r_lua_settop(std::uintptr_t rL, std::uint32_t idx)
+{
+	r_TValue **top = reinterpret_cast<r_TValue**>(rL + offsets::top);
+	r_TValue **base = reinterpret_cast<r_TValue**>(rL + offsets::base);
+	if (idx >= 0)
+	{
+		while (*top < *base + idx)
+		{
+			r_setnilvalue(*top);
+			*top++;
+		}
+		*top = *base + idx;
+	}
+	else
+		*top += idx + 1;
+}
+
+void r_lua_pushraw(std::uintptr_t rL, std::uintptr_t obj, int tt)
+{
+	r_setrawobj2s(rL, obj, tt);
+	r_incr_top(rL);
+}
+
+std::uint32_t r_lua_getmetatable(std::uintptr_t rL, std::uint32_t idx)
+{
+	const r_TValue* obj;
+	auto mt = 0;
+	auto res;
+	obj = r_index2adr(rL, idx);
+
+	switch (r_ttype(obj))
+	{
+	case R_LUA_TTABLE:
+	{
+		std::uintptr_t v5 = *(DWORD*)obj + 24;
+		mt = *(_DWORD*)v5 + 12;
+		break;
+	}
+	case R_LUA_TUSERDATA:
+	{
+		std::uintptr_t v6 = *(DWORD*)obj + 12;
+		mt = v6 ^ *(DWORD*)v6;
+		break;
+	}
+	default:
+	{
+		mt = *_DWORD*)(4 * *(DWORD*)(obj + 12) + 1304 - (rL + 20) + *(DWORD*)(rL + 20));
+		break;
+	}
+	}
+	if (mt == NULL)
+		res = 0;
+	else
+	{
+		r_lua_pushraw(rL, mt, R_LUA_TTABLE);
+		res = 1;
+	}
+	return res;
+}
+
 /* L -> GC */
 void r_luaC_link(std::uintptr_t rL, std::uint32_t o, r_lu_byte tt)
 {
@@ -103,4 +220,14 @@ void r_luaC_link(std::uintptr_t rL, std::uint32_t o, r_lu_byte tt)
 	*reinterpret_cast<std::uint32_t*>(g + offsets::g_rootgc) = o;
 	*reinterpret_cast<r_lu_byte*>(o + offsets::g_marked) = *reinterpret_cast<r_lu_byte*>(g + offsets::g_currentwhite) & 3;
 	*reinterpret_cast<r_lu_byte*>(o + offsets::g_ttype) = tt;
+}
+
+std::uint32_t r_lua_yield(std::uintptr_t rL, std::uint32_t nresults) {
+
+	if (*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_nccalls) > *reinterpret_cast<std::uintptr_t*>(rL + offsets::l_baseccalls))
+		r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
+
+	*reinterpret_cast<std::uintptr_t*>(rL + offsets::base) = *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) - 16 * nresults;
+	*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_status) = R_LUA_YIELD;
+	return -1;
 }
