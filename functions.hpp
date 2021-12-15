@@ -1,6 +1,23 @@
 #include "headers.hpp"
 #include <Windows.h>
 
+__forceinline r_TValue* r_index2adr(std::uintptr_t rL, std::int32_t idx)
+{
+	if (idx > 0)
+	{
+		r_TValue* o = *reinterpret_cast<r_TValue**>(rL + offsets::base) + (idx - 1);
+
+		if (o >= *reinterpret_cast<r_TValue**>(rL + offsets::top))
+			return cast(r_TValue*, r_luaO_nilobject);
+		else
+			return o;
+	}
+	else
+	{
+		return addresses::r_lua_index2adr_slow(rL, idx);
+	}
+}
+
 /* stack -> push */
 void r_lua_pushnil(std::uintptr_t rL)
 {
@@ -136,6 +153,12 @@ void r_lua_remove(std::uintptr_t rL, std::uint32_t idx)
 	r_decr_top(rL);
 }
 
+std::uint32_t r_lua_type(std::uintptr_t rL, std::uint32_t idx)
+{
+	r_TValue* obj = r_index2adr(rL, idx);
+	return obj == r_luaO_nilobject ? R_LUA_TNONE : obj->tt;
+}
+
 void r_lua_insert(std::uintptr_t rL, std::uint32_t idx)
 {
 	auto p = r_index2adr(rL, idx);
@@ -210,6 +233,36 @@ std::uint32_t r_lua_getmetatable(std::uintptr_t rL, std::uint32_t idx)
 		res = 1;
 	}
 	return res;
+}
+
+std::uint32_t r_lua_setmetatable(std::uintptr_t rL, std::int32_t objindex) // didnt check if this actually works, will remove this comment when i confirm it does
+{
+	const r_TValue* obj;
+	std::uintptr_t mt = 0;
+	obj = r_index2adr(rL, objindex);
+
+	switch (r_ttype(obj))
+	{
+	case R_LUA_TTABLE:
+	{
+		std::uintptr_t v5 = *(_DWORD*)obj + 24;
+		*(_DWORD*)v5 + 12 == mt;
+		break;
+	}
+	case R_LUA_TUSERDATA:
+	{
+		std::uintptr_t v6 = *(_DWORD*)obj + 12;
+		v6 ^ *(_DWORD*)v6 == mt;
+		break;
+	}
+	default:
+	{
+		*(_DWORD*)(4 * *(_DWORD*)(obj + 12) + 1304 - (rL + 20) + *(_DWORD*)(rL + 20)) = mt;
+		break;
+	}
+	}
+	r_decr_top(rL);
+	return 1;
 }
 
 /* L -> GC */
