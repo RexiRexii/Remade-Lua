@@ -202,7 +202,7 @@ namespace addresses
 }
 
 /* i didnt wanna put misako's xor number here ok */
-double r_xor_double(double num)
+double r_xor_number(double num)
 {
 	__int64 xorconst = *reinterpret_cast<__int64*>(&num) ^ *reinterpret_cast<__int64*>(addresses::xorconst);
 	return *reinterpret_cast<double*>(&xorconst);
