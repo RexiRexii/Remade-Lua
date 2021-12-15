@@ -198,3 +198,10 @@ namespace addresses
 	typedef std::uint32_t(__fastcall* T_luav_tostring)(std::uintptr_t a1, r_StkId narg);
 	static T_luav_tostring r_luaV_tostring = reinterpret_cast<T_luav_tostring>(aslr(0x1B0D770));
 }
+
+/* i didnt wanna put misako's xor number here ok */
+double r_xor_double(double num)
+{
+	__int64 xorconst = *reinterpret_cast<__int64*>(&num) ^ *reinterpret_cast<__int64*>(addresses::xorconst);
+	return *reinterpret_cast<double*>(&xorconst);
+}
