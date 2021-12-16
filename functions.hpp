@@ -298,3 +298,86 @@ void* r_luaM_realloc_(std::uintptr_t rL, std::size_t osize, std::size_t nsize, s
         *reinterpret_cast<std::uintptr_t*>(g + 4 * memcat + 200) += nsize - osize;
         return result;
 }
+
+/* NEWTHREAD */
+
+void stack_init(const std::uintptr_t rL, const std::uintptr_t L1)
+{
+	std::uint32_t v89 = L1;
+	std::uint32_t v72 = rL;
+
+	auto v94 = *(_DWORD*)(v72 + 20) - (v72 + 20);
+	std::uint32_t v369 = v94;
+	std::uint32_t 	v376 = *(_BYTE*)(v89 + 6);
+
+	std::uint32_t v90 = v369;
+	std::uint32_t v91 = v376;
+	*(_DWORD*)(v369 + 56) += 112;
+	*(_DWORD*)(v90 + 4 * v91 + 200) += 112;
+	std::uint32_t v92 = *(_DWORD*)(v72 + 20) - (v72 + 20);
+	*(_DWORD*)v89 = *(_DWORD*)(v92 + 24);
+	RLOBYTE(v91) = *(_BYTE*)(v92 + 20);
+	*(_DWORD*)(v92 + 24) = v89;
+	*(_BYTE*)(v89 + 4) = v91 & 3;
+	*(_BYTE*)(v89 + 5) = 8;
+	RLOBYTE(v91) = *(_BYTE*)(v72 + 8);
+	*(_BYTE*)(v89 + 6) = v91;
+	v376 = v91;
+	std::uint32_t v93 = *(_DWORD*)(v72 + 20) - (v72 + 20);
+	*(_DWORD*)(v89 + 100) = 0;
+	*(_DWORD*)(v89 + 20) = v89 + 20 + v93;
+	*(_DWORD*)(v89 + 32) = 0;
+	*(_DWORD*)(v89 + 44) = v89 + 44;
+	*(_DWORD*)(v89 + 7) = 0;
+	*(_DWORD*)(v89 + 48) = 0;
+	*(_DWORD*)(v89 + 52) = 0;
+	*(_DWORD*)(v89 + 16) = 0;
+	*(_DWORD*)(v89 + 40) = 0;
+	*(_DWORD*)(v89 + 104) = 0;
+	*(_DWORD*)(v89 + 56) = 0;
+	*(_DWORD*)(v89 + 108) = 0;
+	*(_DWORD*)(v89 + 92) = 0;
+	*(_BYTE*)(v89 + 8) = *(_BYTE*)(v72 + 8);
+	auto v95 = (*(int(__cdecl**)(int, _DWORD, _DWORD, _DWORD, int))(v94 + 12))(v72, *(_DWORD*)(v94 + 16), 0, 0, 192);
+	std::uint32_t v96 = v95;
+	std::uint32_t v97 = v369;
+	std::uint32_t v98 = v376;
+	*(_DWORD*)(v369 + 56) += 192;
+	*(_DWORD*)(v97 + 4 * v98 + 200) += 192;
+	*(_DWORD*)(v89 + 36) = v96 + 168;
+	*(_DWORD*)(v89 + 40) = v96;
+	*(_DWORD*)(v89 + 16) = v96;
+	*(_DWORD*)(v89 + 48) = 8;
+	auto v99 = (*(int(__cdecl**)(int, _DWORD, _DWORD, _DWORD, int))(v369 + 12))(v72, *(_DWORD*)(v369 + 16), 0, 0, 720);
+	std::uint32_t v100 = v369;
+	std::uint32_t v101 = v376;
+	*(_DWORD*)(v369 + 56) += 720;
+	*(_DWORD*)(v100 + 4 * v101 + 200) += 720;
+	std::uint32_t v102 = 0;
+	*(_DWORD*)(v89 + 32) = v99;
+	*(_DWORD*)(v89 + 44) = v89 + 89;
+	do
+	{
+		*(_DWORD*)(v102 + *(_DWORD*)(v89 + 32) + 12) = 0;
+		v102 += 16;
+	} while (v102 < 720);
+	auto v103 = *(_DWORD*)(v89 + 32);
+	*(_DWORD*)(v89 + 24) = v103;
+	*(_DWORD*)(v89 + 28) = v103 + 16 * (*(_DWORD*)(v89 + 44) - (v89 + 44) - 6);
+	**(_DWORD**)(v89 + 16) = v103;
+	*(_DWORD*)(*(_DWORD*)(v89 + 24) + 12) = 0;
+	*(_DWORD*)(v89 + 24) += 16;
+	*(_DWORD*)(*(_DWORD*)(v89 + 16) + 4) = *(_DWORD*)(v89 + 24);
+	auto v104 = *(_DWORD*)(v89 + 16);
+	*(_DWORD*)(v89 + 12) = *(_DWORD*)(v104 + 4);
+	*(_DWORD*)(v104 + 12) = *(_DWORD*)(v89 + 24) + 320;
+	*(_DWORD*)(v89 + 80) = *(_DWORD*)(v72 + 80);
+	*(_BYTE*)(v89 + 10) = *(_BYTE*)(v72 + 10);
+	auto v105 = *(_DWORD*)(v72 + 24);
+	*(_DWORD*)v105 = v89;
+	*(_DWORD*)(v105 + 12) = 8;
+	*(_DWORD*)(v72 + 24) += 16;
+	auto v106 = *(_DWORD*)(*(_DWORD*)(v72 + 20) - (v72 + 20) + 2004);
+	if (v106)
+		((void(__cdecl*)(int, int))v106)(v72, v89);
+}
