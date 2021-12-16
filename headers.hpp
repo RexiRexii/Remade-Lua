@@ -150,6 +150,12 @@ typedef struct r_lua_TValue
 #define cast_num(i)		cast(r_lua_Number, (i))
 #define cast_int(i)		cast(int, (i))
 
+/* Self-identifying threads (with some extra storage) */
+#define CELI_EXTRASPACE 4
+#define celi_getstate(l) cast(std::uintptr_t, (cast(r_lu_byte *, l) + CELI_EXTRASPACE))
+#define celi_getspace(l) cast(std::uintptr_t, (cast(r_lu_byte *, l) - CELI_EXTRASPACE))
+#define celi_statesize(s) (s + CELI_EXTRASPACE)
+
 #define r_obj2gco(v)	(cast(r_GCObject *, (v)))
 
 #define r_G(v7) (*(DWORD*)(v7 + offsets::l_G) - (v7 + offsets::l_G)) // THIS CHANGES EVERY UPDATE
