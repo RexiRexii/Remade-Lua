@@ -9,8 +9,8 @@ typedef double r_lua_Number;
 typedef ptrdiff_t r_lua_Integer;
 
 /* Pseudo-code types */
-#define _DWORD std::uintptr_t
-#define _BYTE BYTE
+typedef std::uintptr_t _DWORD;
+typedef BYTE _BYTE;
 
 struct r_GCheader
 {
