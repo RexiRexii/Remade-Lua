@@ -245,24 +245,34 @@ std::uint32_t r_lua_setmetatable(std::uintptr_t rL, std::int32_t objindex) // di
 	{
 	case R_LUA_TTABLE:
 	{
-		std::uintptr_t v5 = *(_DWORD*)obj + 24;
+		std::uintptr_t v5 = *(DWORD*)obj + 24;
 		*(_DWORD*)v5 + 12 == mt;
 		break;
 	}
 	case R_LUA_TUSERDATA:
 	{
-		std::uintptr_t v6 = *(_DWORD*)obj + 12;
+		std::uintptr_t v6 = *(DWORD*)obj + 12;
 		v6 ^ *(_DWORD*)v6 == mt;
 		break;
 	}
 	default:
 	{
-		*(_DWORD*)(4 * *(_DWORD*)(obj + 12) + 1304 - (rL + 20) + *(_DWORD*)(rL + 20)) = mt;
+		*(DWORD*)(4 * *(DWORD*)(obj + 12) + 1304 - (rL + 20) + *(_DWORD*)(rL + 20)) = mt;
 		break;
 	}
 	}
 	r_decr_top(rL);
 	return 1;
+}
+
+std::uint32_t r_lua_yield(std::uintptr_t rL, std::uint32_t nresults) {
+
+	if (*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_nccalls) > *reinterpret_cast<std::uintptr_t*>(rL + offsets::l_baseccalls))
+		r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
+
+	*reinterpret_cast<std::uintptr_t*>(rL + offsets::base) = *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) - 16 * nresults;
+	*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_status) = R_LUA_YIELD;
+	return -1;
 }
 
 /* L -> GC */
@@ -275,12 +285,16 @@ void r_luaC_link(std::uintptr_t rL, std::uint32_t o, r_lu_byte tt)
 	*reinterpret_cast<r_lu_byte*>(o + offsets::g_ttype) = tt;
 }
 
-std::uint32_t r_lua_yield(std::uintptr_t rL, std::uint32_t nresults) {
-
-	if (*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_nccalls) > *reinterpret_cast<std::uintptr_t*>(rL + offsets::l_baseccalls))
-		r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
-
-	*reinterpret_cast<std::uintptr_t*>(rL + offsets::base) = *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) - 16 * nresults;
-	*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_status) = R_LUA_YIELD;
-	return -1;
+void* r_luaM_realloc_(std::uintptr_t rL, std::size_t osize, std::size_t nsize, std::uint8_t memcat)
+{
+        const auto g = r_G(rL);
+        void* result;
+        result = (std::uintptr_t*)(*(std::uint32_t(__cdecl**)(std::uint32_t, std::uintptr_t, std::uintptr_t, std::uintptr_t, std::uint32_t))(g + 12))(rL, *reinterpret_cast<std::uintptr_t*>(g + 16), 0, osize, nsize);
+	
+        if (result == NULL && nsize > 0)
+            throw std::exception("not enough memory");
+	
+        *reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) = (*reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) - osize) + nsize;
+        *reinterpret_cast<std::uintptr_t*>(g + 4 * memcat + 200) += nsize - osize;
+        return result;
 }
