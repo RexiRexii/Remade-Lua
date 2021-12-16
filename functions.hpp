@@ -238,7 +238,7 @@ std::uint32_t r_lua_getmetatable(std::uintptr_t rL, std::uint32_t idx)
 std::uint32_t r_lua_setmetatable(std::uintptr_t rL, std::int32_t objindex) // didnt check if this actually works, will remove this comment when i confirm it does
 {
 	const r_TValue* obj;
-	std::uintptr_t mt = 0;
+	auto mt = 0;
 	obj = r_index2adr(rL, objindex);
 
 	switch (r_ttype(obj))
@@ -257,7 +257,7 @@ std::uint32_t r_lua_setmetatable(std::uintptr_t rL, std::int32_t objindex) // di
 	}
 	default:
 	{
-		*(DWORD*)(4 * *(DWORD*)(obj + 12) + 1304 - (rL + 20) + *(_DWORD*)(rL + 20)) = mt;
+		*(DWORD*)(4 * *(DWORD*)(obj + 12) + 1304 - (rL + 20) + *(DWORD*)(rL + 20)) = mt;
 		break;
 	}
 	}
