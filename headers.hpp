@@ -8,6 +8,10 @@ typedef BYTE r_lu_byte;
 typedef double r_lua_Number;
 typedef ptrdiff_t r_lua_Integer;
 
+/* Pseudo-code types */
+#define _DWORD std::uintptr_t
+#define _BYTE BYTE
+
 struct r_GCheader
 {
 	r_GCObject *next;
