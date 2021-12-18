@@ -162,7 +162,16 @@ typedef struct r_lua_TValue
 
 #define r_obj2gco(v)	(cast(r_GCObject *, (v)))
 
+#define r_getstr(ts) ((char *)ts + offsets::ts_str)
 #define r_G(v7) (*(DWORD*)(v7 + offsets::l_G) - (v7 + offsets::l_G)) // THIS CHANGES EVERY UPDATE
+
+namespace obfuscations
+{
+    std::uint32_t deobf_tstring_len(const std::uintptr_t tstring) 
+    { 
+	    return (tstring + 16) + *reinterpret_cast<const std::uint32_t*>(tstring + 16); 
+    }
+}
 
 namespace offsets
 {
@@ -171,7 +180,7 @@ namespace offsets
 	const std::uint16_t base = 12;
 	const std::uint16_t isC = 7;
 
-	const std::uint16_t ts_len = 12;
+	const std::uint16_t ts_len = 16;
 	const std::uint16_t ts_str = 20;
 
 	const std::uint16_t g_totalbytes = 56;
