@@ -126,7 +126,7 @@ const char* r_lua_tolstring(std::uintptr_t rL, std::uint32_t idx, std::size_t* l
 		o = r_index2adr(rL, idx); /* previous call may reallocate the stack */
 	}
 	if (len != NULL)
-		*len = deobf_tstring_len(reinterpret_cast<std::uintptr_t>(o->value.gc));
+		*len = obfuscations::deobf_tstring_len(reinterpret_cast<std::uintptr_t>(o->value.gc));
 	return r_getstr(o->value.gc);
 }
 
