@@ -130,6 +130,21 @@ const char* r_lua_tolstring(std::uintptr_t rL, std::uint32_t idx, std::size_t* l
 	return r_getstr(o->value.gc);
 }
 
+/* luaL */
+// luaL
+r_lua_Number r_luaL_checknumber(std::uintptr_t rL, std::uint32_t narg) {
+	r_lua_Number d = r_lua_tonumber(rL, narg);
+	if (d == 0)  /* avoid extra test when d is not 0 */
+		printf("bruh moment in checknumber\n");
+	return d;
+}
+
+void r_luaL_checktype(std::uintptr_t rL, std::uint32_t narg, std::uint32_t t)
+{
+	if (r_lua_type(rL, narg) != t)
+		r_luaL_error(rL, "Invalid type.");
+}
+
 /* state -> other */
 void r_lua_xmove(std::uintptr_t from, std::uintptr_t to, std::uint32_t n)
 {
