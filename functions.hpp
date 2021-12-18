@@ -112,6 +112,24 @@ const void* r_lua_topointer(std::uintptr_t rL, std::uint32_t idx)
 	}
 }
 
+const char* r_lua_tolstring(std::uintptr_t rL, std::uint32_t idx, std::size_t* len)
+{
+	r_StkId o = r_index2adr(rL, idx);
+	if (!r_ttisstring(o))
+	{
+		if (!addresses::r_luaV_tostring(rL, o))
+		{ /* conversion failed? */
+			if (len != NULL)
+				*len = 0;
+			return NULL;
+		}
+		o = r_index2adr(rL, idx); /* previous call may reallocate the stack */
+	}
+	if (len != NULL)
+		*len = deobf_tstring_len(reinterpret_cast<std::uintptr_t>(o->value.gc));
+	return r_getstr(o->value.gc);
+}
+
 /* state -> other */
 void r_lua_xmove(std::uintptr_t from, std::uintptr_t to, std::uint32_t n)
 {
