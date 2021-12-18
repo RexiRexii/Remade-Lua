@@ -142,6 +142,18 @@ typedef struct r_lua_TValue
 	o1->value = o2->value; \
 }
 
+#define r_ttype(o) ((o)->tt)
+#define r_ttisfunction(o)           (r_ttype(o) == R_LUA_TFUNCTION)
+#define r_ttistable(o)				(r_ttype(o) == R_LUA_TTABLE)
+#define r_ttislightuserdata(o)		(r_ttype(o) == R_LUA_TLIGHTUSERDATA)
+#define r_ttisnil(o)                (r_ttype(o) == R_LUA_TNIL)
+#define r_ttisnumber(o)				(r_ttype(o) == R_LUA_TNUMBER)
+#define r_ttisstring(o)				(r_ttype(o) == R_LUA_TSTRING)
+#define r_ttisboolean(o)			(r_ttype(o) == R_LUA_TBOOLEAN)
+#define r_ttisthread(o)				(r_ttype(o) == R_LUA_TTHREAD)
+#define r_ttisnone(o)				(r_ttype(o) == R_LUA_TNONE)
+#define r_ttisnoneornil(o)			(r_ttype(o) <= R_LUA_TNIL)
+
 #ifndef cast
 #define cast(t, exp)	((t)(exp))
 #endif
