@@ -154,6 +154,9 @@ typedef struct r_lua_TValue
 #define r_ttisnone(o)				(r_ttype(o) == R_LUA_TNONE)
 #define r_ttisnoneornil(o)			(r_ttype(o) <= R_LUA_TNIL)
 
+#define r_incr_top(rL) *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) += sizeof(r_TValue)
+#define r_decr_top(rL) *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) -= sizeof(r_TValue)
+
 #ifndef cast
 #define cast(t, exp)	((t)(exp))
 #endif
