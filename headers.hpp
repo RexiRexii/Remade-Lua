@@ -1,7 +1,10 @@
 #include <Windows.h>
+#include <cstdint>
+#include <cmath>
 
 // Rebasing for addresses
 #define aslr(x) (x - 0x400000 + (DWORD)GetModuleHandle(0))
+#define RLOBYTE(x)   (*((BYTE*)&(x)))   // low byte
 
 // Lua C-types
 typedef BYTE r_lu_byte;
@@ -14,7 +17,7 @@ typedef BYTE _BYTE;
 
 struct r_GCheader
 {
-	r_GCObject *next;
+	r_GCObject* next;
 	r_lu_byte tt;
 	r_lu_byte marked;
 	r_lu_byte _pad;
@@ -34,18 +37,20 @@ union r_GCObject
 
 typedef union
 {
-	r_GCObject *gc;
-	void *p;
+	r_GCObject* gc;
+	void* p;
 	std::double_t n;
 	std::uint32_t b;
 } r_Value;
 
 typedef struct r_lua_TValue
 {
-	r_Value value; 
-	r_lua_TValue* ptr; 
+	r_Value value;
+	r_lua_TValue* ptr;
 	std::uint32_t tt;
 } r_TValue;
+
+typedef r_TValue* r_StkId;
 
 #define R_LUA_TNONE -1
 #define R_LUA_TNIL 0
@@ -64,6 +69,17 @@ typedef struct r_lua_TValue
 #define R_LUA_GLOBALSINDEX -10002
 
 #define r_lua_upvalueindex(i) (R_LUA_GLOBALSINDEX-(i))
+
+/* thread status; 0 is OK */
+#define R_LUA_OK 0
+#define R_LUA_YIELD 1
+#define R_LUA_ERRRUN 2
+#define R_LUA_ERRSYNTAX 3
+#define R_LUA_ERRMEM 4
+#define R_LUA_ERRERR 5
+#define R_LUA_BREAK 6
+#define R_LUA_ERRUNK 7
+#define R_LUA_MULTRET -1
 
 #define r_setnilvalue(obj) \
 { \
@@ -142,6 +158,13 @@ typedef struct r_lua_TValue
 	o1->value = o2->value; \
 }
 
+#define r_setrawobj2s(rL, obj1, obj2) \
+{ \
+    r_TValue* top = *reinterpret_cast<r_TValue**>(rL + offsets::top); \
+    top->value.gc = reinterpret_cast<r_GCObject*>(obj); \
+    top->tt = obj2; \
+}
+
 #define r_ttype(o) ((o)->tt)
 #define r_ttisfunction(o)           (r_ttype(o) == R_LUA_TFUNCTION)
 #define r_ttistable(o)				(r_ttype(o) == R_LUA_TTABLE)
@@ -182,10 +205,10 @@ typedef struct r_lua_TValue
 
 namespace obfuscations
 {
-    std::uint32_t deobf_tstring_len(const std::uintptr_t tstring) 
-    { 
-	    return (tstring + 16) + *reinterpret_cast<const std::uint32_t*>(tstring + 16); 
-    }
+	std::uint32_t deobf_tstring_len(const std::uintptr_t tstring)
+	{
+		return (tstring + 16) + *reinterpret_cast<const std::uint32_t*>(tstring + 16);
+	}
 }
 
 namespace offsets
@@ -217,9 +240,24 @@ namespace offsets
 	const std::uint16_t l_status = 7;
 	const std::uint16_t l_stackstate = 9;
 	const std::uint16_t l_global = 12;
+	const std::uint16_t l_activememcat = 8;
 
 	const std::uint16_t l_ci = 20;
 	const std::uint16_t l_base_ci = 40;
+
+	const std::uint16_t t_node = 32;
+	const std::uint16_t t_lsizenode = 9;
+	const std::uint16_t t_sizearray = 12;
+	const std::uint16_t t_array_ = 20;
+	const std::uint16_t t_flags = 7;
+	const std::uint16_t t_gclist = 28;
+	const std::uint16_t t_nodemask8 = 11;
+	const std::uint16_t t_safeenv = 10;
+	const std::uint16_t t_marked = 4;
+	const std::uint16_t t_metatable = 24;
+	const std::uint16_t t_next = 0;
+	const std::uint16_t t_readonly = 8;
+	const std::uint16_t t_tt = 5;
 	/* END OF OFFSETS */
 }
 
@@ -227,8 +265,8 @@ namespace addresses
 {
 	/* below are the ones that are actively being used. */
 	static const auto xorconst = aslr(0x35546A0);
-        static const auto r_luao_nilobj = aslr(0x2E29680);
-	
+	static const auto r_luao_nilobj = aslr(0x2E29680);
+
 	typedef r_TValue* (__fastcall* T_index2adrslow)(std::uintptr_t rL, std::int32_t idx);
 	static T_index2adrslow r_lua_index2adr_slow = reinterpret_cast<T_index2adrslow>(aslr(0x1a8fad0));
 
