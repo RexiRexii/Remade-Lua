@@ -315,7 +315,7 @@ void* r_luaM_new_(std::uintptr_t rL, std::size_t nsize, std::uint8_t memcat)
 {
 	const auto g = r_G(rL);
 	void* result;
-	result = (uintptr_t*)(*(int(__cdecl**)(int, DWORD, DWORD, DWORD, int))(g + 12))(rL, *(DWORD*)(g + 16), 0, 0, nsize);
+	result = (std::uintptr_t*)(*(std::uint32_t(__cdecl**)(std::uint32_t, std::uintptr_t, std::uintptr_t, std::uintptr_t, std::uint32_t))(g + offsets::g_frealloc))(rL, *reinterpret_cast<std::uintptr_t*>(g + 16), 0, 0, nsize);
 
 	if (result == NULL && nsize > 0)
 		throw std::exception("not enough memory");
