@@ -281,6 +281,26 @@ std::uint32_t r_lua_setmetatable(std::uintptr_t rL, std::int32_t objindex) // di
 	return 1;
 }
 
+std::uint32_t r_lua_yield(std::uintptr_t rL, std::uint32_t nresults) {
+
+	if (*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_nccalls) > *reinterpret_cast<std::uintptr_t*>(rL + offsets::l_baseccalls))
+		printf("attempt to yield across metamethod/C-call boundary\n");
+		// r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
+
+	*reinterpret_cast<std::uintptr_t*>(rL + offsets::base) = *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) - 16 * nresults;
+	*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_status) = R_LUA_YIELD;
+	return -1;
+}
+
+void r_luaC_link(std::uintptr_t rL, std::uint32_t o, r_lu_byte tt)
+{
+	const auto g = r_G(rL); // getglobalstate
+	*reinterpret_cast<std::uint32_t*>(o) = *reinterpret_cast<std::uint32_t*>(g + offsets::g_next);
+	*reinterpret_cast<std::uint32_t*>(g + offsets::g_rootgc) = o;
+	*reinterpret_cast<r_lu_byte*>(o + offsets::g_marked) = *reinterpret_cast<r_lu_byte*>(g + offsets::g_currentwhite) & 3;
+	*reinterpret_cast<r_lu_byte*>(o + offsets::g_ttype) = tt;
+}
+
 void* r_luaM_realloc_(std::uintptr_t rL, std::size_t osize, std::size_t nsize, std::uint8_t memcat)
 {
 	const auto g = r_G(rL);
@@ -332,26 +352,6 @@ void r_lua_createtable(std::uintptr_t rL)
 	r_sethvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), r_luaH_new(rL));
 	r_incr_top(rL);
 	return;
-}
-
-std::uint32_t r_lua_yield(std::uintptr_t rL, std::uint32_t nresults) {
-
-	if (*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_nccalls) > *reinterpret_cast<std::uintptr_t*>(rL + offsets::l_baseccalls))
-		printf("attempt to yield across metamethod/C-call boundary\n");
-		// r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
-
-	*reinterpret_cast<std::uintptr_t*>(rL + offsets::base) = *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) - 16 * nresults;
-	*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_status) = R_LUA_YIELD;
-	return -1;
-}
-
-void r_luaC_link(std::uintptr_t rL, std::uint32_t o, r_lu_byte tt)
-{
-	const auto g = r_G(rL); // getglobalstate
-	*reinterpret_cast<std::uint32_t*>(o) = *reinterpret_cast<std::uint32_t*>(g + offsets::g_next);
-	*reinterpret_cast<std::uint32_t*>(g + offsets::g_rootgc) = o;
-	*reinterpret_cast<r_lu_byte*>(o + offsets::g_marked) = *reinterpret_cast<r_lu_byte*>(g + offsets::g_currentwhite) & 3;
-	*reinterpret_cast<r_lu_byte*>(o + offsets::g_ttype) = tt;
 }
 
 /* NEWTHREAD */
