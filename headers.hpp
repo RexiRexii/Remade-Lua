@@ -223,14 +223,17 @@ namespace offsets
 namespace addresses
 {
 	/* below are the ones that are actively being used. */
-	static auto xorconst = aslr(0x35546A0);
-
+	static const auto xorconst = aslr(0x35546A0);
+        static const auto r_luao_nilobj = aslr(0x2E29680);
+	
 	typedef r_TValue* (__fastcall* T_index2adrslow)(std::uintptr_t rL, std::int32_t idx);
 	static T_index2adrslow r_lua_index2adr_slow = reinterpret_cast<T_index2adrslow>(aslr(0x1a8fad0));
 
 	typedef std::uint32_t(__fastcall* T_luav_tostring)(std::uintptr_t a1, r_StkId narg);
 	static T_luav_tostring r_luaV_tostring = reinterpret_cast<T_luav_tostring>(aslr(0x1B0D770));
 }
+
+#define r_luaO_nilobject (reinterpret_cast<r_StkId>(addresses::r_luao_nilobj))
 
 /* i didnt wanna put misako's xor number here ok */
 double r_xor_number(double num)
