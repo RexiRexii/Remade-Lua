@@ -131,7 +131,6 @@ const char* r_lua_tolstring(std::uintptr_t rL, std::uint32_t idx, std::size_t* l
 }
 
 /* luaL */
-// luaL
 r_lua_Number r_luaL_checknumber(std::uintptr_t rL, std::uint32_t narg) {
 	r_lua_Number d = r_lua_tonumber(rL, narg);
 	if (d == 0)  /* avoid extra test when d is not 0 */
@@ -298,26 +297,6 @@ std::uint32_t r_lua_setmetatable(std::uintptr_t rL, std::int32_t objindex) // di
 	return 1;
 }
 
-std::uint32_t r_lua_yield(std::uintptr_t rL, std::uint32_t nresults) {
-
-	if (*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_nccalls) > *reinterpret_cast<std::uintptr_t*>(rL + offsets::l_baseccalls))
-		r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
-
-	*reinterpret_cast<std::uintptr_t*>(rL + offsets::base) = *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) - 16 * nresults;
-	*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_status) = R_LUA_YIELD;
-	return -1;
-}
-
-/* L -> GC */
-void r_luaC_link(std::uintptr_t rL, std::uint32_t o, r_lu_byte tt)
-{
-	const auto g = r_G(rL); // getglobalstate
-	*reinterpret_cast<std::uint32_t*>(o) = *reinterpret_cast<std::uint32_t*>(g + offsets::g_next);
-	*reinterpret_cast<std::uint32_t*>(g + offsets::g_rootgc) = o;
-	*reinterpret_cast<r_lu_byte*>(o + offsets::g_marked) = *reinterpret_cast<r_lu_byte*>(g + offsets::g_currentwhite) & 3;
-	*reinterpret_cast<r_lu_byte*>(o + offsets::g_ttype) = tt;
-}
-
 void* r_luaM_realloc_(std::uintptr_t rL, std::size_t osize, std::size_t nsize, std::uint8_t memcat)
 {
         const auto g = r_G(rL);
@@ -330,6 +309,64 @@ void* r_luaM_realloc_(std::uintptr_t rL, std::size_t osize, std::size_t nsize, s
         *reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) = (*reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) - osize) + nsize;
         *reinterpret_cast<std::uintptr_t*>(g + 4 * memcat + 200) += nsize - osize;
         return result;
+}
+
+void* r_luaM_new_(std::uintptr_t rL, std::size_t nsize, std::uint8_t memcat)
+{
+	const auto g = r_G(rL);
+	void* result;
+	result = (uintptr_t*)(*(int(__cdecl**)(int, DWORD, DWORD, DWORD, int))(g + 12))(rL, *(DWORD*)(g + 16), 0, 0, nsize);
+
+	if (result == NULL && nsize > 0)
+		throw std::exception("not enough memory");
+
+	*reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) += nsize;
+	*reinterpret_cast<std::uintptr_t*>(g + 4 * memcat + 200) += nsize;
+	return result;
+}
+
+std::uint32_t* r_luaH_new(const std::uintptr_t rL)
+{
+    auto t = reinterpret_cast<std::uintptr_t*>(r_luaM_new_(rL, 36u, *reinterpret_cast<BYTE*>(rL + lua_state_activememcat)));
+    r_luaC_link(rL, reinterpret_cast<std::uintptr_t>(t), R_LUA_TTABLE);
+
+    *reinterpret_cast<std::uintptr_t*>(t + offsets::t_metatable) = *reinterpret_cast<std::uintptr_t*>(rL + 12); // requires metatable obfuscation
+    *reinterpret_cast<std::uint8_t*>(t + offsets::t_flags) = 0;
+    *reinterpret_cast<std::uintptr_t*>(t + offsets::t_array_) = 0;
+    *reinterpret_cast<std::uintptr_t*>(t + offsets::t_sizearray) = 0;
+    *reinterpret_cast<std::uint8_t*>(t + offsets::t_lsizenode) = 0;
+    *reinterpret_cast<std::uint8_t*>(t + offsets::t_readonly) = 0;
+    *reinterpret_cast<std::uint8_t*>(t + offsets::t_safeenv) = 0;
+    *reinterpret_cast<std::uint8_t*>(t + offsets::t_nodemask8) = 0;
+	
+    return t;
+    // side note: we will never use 2nd and 3rd arg so we just completely remove the use of em
+}
+
+void r_lua_createtable(std::uintptr_t rL)
+{
+    r_sethvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), r_luaH_new(rL));
+    r_incr_top(rL);
+    return;
+}
+
+std::uint32_t r_lua_yield(std::uintptr_t rL, std::uint32_t nresults) {
+
+	if (*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_nccalls) > *reinterpret_cast<std::uintptr_t*>(rL + offsets::l_baseccalls))
+		r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
+
+	*reinterpret_cast<std::uintptr_t*>(rL + offsets::base) = *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) - 16 * nresults;
+	*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_status) = R_LUA_YIELD;
+	return -1;
+}
+
+void r_luaC_link(std::uintptr_t rL, std::uint32_t o, r_lu_byte tt)
+{
+	const auto g = r_G(rL); // getglobalstate
+	*reinterpret_cast<std::uint32_t*>(o) = *reinterpret_cast<std::uint32_t*>(g + offsets::g_next);
+	*reinterpret_cast<std::uint32_t*>(g + offsets::g_rootgc) = o;
+	*reinterpret_cast<r_lu_byte*>(o + offsets::g_marked) = *reinterpret_cast<r_lu_byte*>(g + offsets::g_currentwhite) & 3;
+	*reinterpret_cast<r_lu_byte*>(o + offsets::g_ttype) = tt;
 }
 
 /* NEWTHREAD */
