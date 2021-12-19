@@ -1,5 +1,7 @@
 #include "headers.hpp"
 #include <Windows.h>
+#include <exception>
+#include <stdio.h>
 
 __forceinline r_TValue* r_index2adr(std::uintptr_t rL, std::int32_t idx)
 {
@@ -45,8 +47,8 @@ void r_lua_pushnumber(std::uintptr_t rL, std::double_t num)
 
 void r_lua_pushvalue(std::uintptr_t rL, std::uint32_t idx)
 {
-        r_setobj2s(*reinterpret_cast<r_TValue**>(rL + offsets::top), r_index2adr(rL, idx));
-        r_incr_top(rL);
+	r_setobj2s(*reinterpret_cast<r_TValue**>(rL + offsets::top), r_index2adr(rL, idx));
+	r_incr_top(rL);
 }
 
 void r_lua_pushinteger(std::uintptr_t rL, std::uint32_t n)
@@ -55,7 +57,7 @@ void r_lua_pushinteger(std::uintptr_t rL, std::uint32_t n)
 	r_incr_top(rL);
 }
 
-void r_lua_pushlightuserdata(std::uintptr_t rL, void* p) 
+void r_lua_pushlightuserdata(std::uintptr_t rL, void* p)
 {
 	r_setpvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), p);
 	r_incr_top(rL);
@@ -78,7 +80,7 @@ std::double_t r_lua_tonumber(std::uintptr_t rL, std::int32_t idx)
 	return r_xor_number(raw_value);
 }
 
-std::uint32_t r_lua_tointeger(std::uintptr_t rL, std::uint32_t idx) 
+std::uint32_t r_lua_tointeger(std::uintptr_t rL, std::uint32_t idx)
 {
 	r_TValue* top = r_index2adr(rL, idx);
 
@@ -91,25 +93,6 @@ bool r_lua_toboolean(std::uintptr_t rL, std::uint32_t idx)
 {
 	r_TValue* top = r_index2adr(rL, idx);
 	return reinterpret_cast<r_TValue*>(top)->value.b;
-}
-
-const void* r_lua_topointer(std::uintptr_t rL, std::uint32_t idx)
-{
-	r_StkId o = r_index2adr(rL, idx);
-	switch (r_ttype(o))
-	{
-	case R_LUA_TTABLE:
-		return &(o)->value.gc->h;
-	case R_LUA_TFUNCTION:
-		return &(o)->value.gc->cl;
-	case R_LUA_TTHREAD:
-		return r_lua_tothread(rL, idx);
-	case R_LUA_TUSERDATA:
-	case R_LUA_TLIGHTUSERDATA:
-		return r_lua_touserdata(rL, idx);
-	default:
-		return NULL;
-	}
 }
 
 const char* r_lua_tolstring(std::uintptr_t rL, std::uint32_t idx, std::size_t* len)
@@ -141,7 +124,8 @@ r_lua_Number r_luaL_checknumber(std::uintptr_t rL, std::uint32_t narg) {
 void r_luaL_checktype(std::uintptr_t rL, std::uint32_t narg, std::uint32_t t)
 {
 	if (r_lua_type(rL, narg) != t)
-		r_luaL_error(rL, "Invalid type.");
+		printf("Invalid type.\n");
+		// r_luaL_error(rL, "Invalid type.");
 }
 
 /* state -> other */
@@ -164,7 +148,7 @@ void r_lua_replace(std::uintptr_t rL, std::uint32_t idx)
 
 	if (idx == R_LUA_ENVIRONINDEX)
 	{
-	//	r_luaL_error(rL, "no calling environment");
+		//	r_luaL_error(rL, "no calling environment");
 		printf("no calling environment\n"); // use r_luaL_error if you want
 	}
 
@@ -209,8 +193,8 @@ std::uint32_t r_lua_gettop(std::uintptr_t rL)
 
 void r_lua_settop(std::uintptr_t rL, std::uint32_t idx)
 {
-	r_TValue **top = reinterpret_cast<r_TValue**>(rL + offsets::top);
-	r_TValue **base = reinterpret_cast<r_TValue**>(rL + offsets::base);
+	r_TValue** top = reinterpret_cast<r_TValue**>(rL + offsets::top);
+	r_TValue** base = reinterpret_cast<r_TValue**>(rL + offsets::base);
 	if (idx >= 0)
 	{
 		while (*top < *base + idx)
@@ -234,7 +218,7 @@ std::uint32_t r_lua_getmetatable(std::uintptr_t rL, std::uint32_t idx)
 {
 	const r_TValue* obj;
 	auto mt = 0;
-	auto res;
+	std::uintptr_t res;
 	obj = r_index2adr(rL, idx);
 
 	switch (r_ttype(obj))
@@ -253,7 +237,7 @@ std::uint32_t r_lua_getmetatable(std::uintptr_t rL, std::uint32_t idx)
 	}
 	default:
 	{
-		mt = *_DWORD*)(4 * *(DWORD*)(obj + 12) + 1304 - (rL + 20) + *(DWORD*)(rL + 20));
+		mt = *(DWORD*)(4 * *(DWORD*)(obj + 12) + 1304 - (rL + 20) + *(DWORD*)(rL + 20));
 		break;
 	}
 	}
@@ -284,7 +268,7 @@ std::uint32_t r_lua_setmetatable(std::uintptr_t rL, std::int32_t objindex) // di
 	case R_LUA_TUSERDATA:
 	{
 		std::uintptr_t v6 = *(DWORD*)obj + 12;
-		v6 ^ *(_DWORD*)v6 == mt;
+		v6^* (_DWORD*)v6 == mt;
 		break;
 	}
 	default:
@@ -299,16 +283,16 @@ std::uint32_t r_lua_setmetatable(std::uintptr_t rL, std::int32_t objindex) // di
 
 void* r_luaM_realloc_(std::uintptr_t rL, std::size_t osize, std::size_t nsize, std::uint8_t memcat)
 {
-        const auto g = r_G(rL);
-        void* result;
-        result = (std::uintptr_t*)(*(std::uint32_t(__cdecl**)(std::uint32_t, std::uintptr_t, std::uintptr_t, std::uintptr_t, std::uint32_t))(g + 12))(rL, *reinterpret_cast<std::uintptr_t*>(g + 16), 0, osize, nsize);
-	
-        if (result == NULL && nsize > 0)
-            throw std::exception("not enough memory");
-	
-        *reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) = (*reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) - osize) + nsize;
-        *reinterpret_cast<std::uintptr_t*>(g + 4 * memcat + 200) += nsize - osize;
-        return result;
+	const auto g = r_G(rL);
+	void* result;
+	result = (std::uintptr_t*)(*(std::uint32_t(__cdecl**)(std::uint32_t, std::uintptr_t, std::uintptr_t, std::uintptr_t, std::uint32_t))(g + 12))(rL, *reinterpret_cast<std::uintptr_t*>(g + 16), 0, osize, nsize);
+
+	if (result == NULL && nsize > 0)
+		throw std::exception("not enough memory");
+
+	*reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) = (*reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) - osize) + nsize;
+	*reinterpret_cast<std::uintptr_t*>(g + 4 * memcat + 200) += nsize - osize;
+	return result;
 }
 
 void* r_luaM_new_(std::uintptr_t rL, std::size_t nsize, std::uint8_t memcat)
@@ -327,33 +311,34 @@ void* r_luaM_new_(std::uintptr_t rL, std::size_t nsize, std::uint8_t memcat)
 
 std::uint32_t* r_luaH_new(const std::uintptr_t rL)
 {
-    auto t = reinterpret_cast<std::uintptr_t*>(r_luaM_new_(rL, 36u, *reinterpret_cast<BYTE*>(rL + lua_state_activememcat)));
-    r_luaC_link(rL, reinterpret_cast<std::uintptr_t>(t), R_LUA_TTABLE);
+	auto t = reinterpret_cast<std::uintptr_t*>(r_luaM_new_(rL, 36u, *reinterpret_cast<BYTE*>(rL + offsets::l_activememcat)));
+	r_luaC_link(rL, reinterpret_cast<std::uintptr_t>(t), R_LUA_TTABLE);
 
-    *reinterpret_cast<std::uintptr_t*>(t + offsets::t_metatable) = *reinterpret_cast<std::uintptr_t*>(rL + 12); // requires metatable obfuscation
-    *reinterpret_cast<std::uint8_t*>(t + offsets::t_flags) = 0;
-    *reinterpret_cast<std::uintptr_t*>(t + offsets::t_array_) = 0;
-    *reinterpret_cast<std::uintptr_t*>(t + offsets::t_sizearray) = 0;
-    *reinterpret_cast<std::uint8_t*>(t + offsets::t_lsizenode) = 0;
-    *reinterpret_cast<std::uint8_t*>(t + offsets::t_readonly) = 0;
-    *reinterpret_cast<std::uint8_t*>(t + offsets::t_safeenv) = 0;
-    *reinterpret_cast<std::uint8_t*>(t + offsets::t_nodemask8) = 0;
-	
-    return t;
-    // side note: we will never use 2nd and 3rd arg so we just completely remove the use of em
+	*reinterpret_cast<std::uintptr_t*>(t + offsets::t_metatable) = *reinterpret_cast<std::uintptr_t*>(rL + 12); // requires metatable obfuscation
+	*reinterpret_cast<std::uint8_t*>(t + offsets::t_flags) = 0;
+	*reinterpret_cast<std::uintptr_t*>(t + offsets::t_array_) = 0;
+	*reinterpret_cast<std::uintptr_t*>(t + offsets::t_sizearray) = 0;
+	*reinterpret_cast<std::uint8_t*>(t + offsets::t_lsizenode) = 0;
+	*reinterpret_cast<std::uint8_t*>(t + offsets::t_readonly) = 0;
+	*reinterpret_cast<std::uint8_t*>(t + offsets::t_safeenv) = 0;
+	*reinterpret_cast<std::uint8_t*>(t + offsets::t_nodemask8) = 0;
+
+	return t;
+	// side note: we will never use 2nd and 3rd arg so we just completely remove the use of em
 }
 
 void r_lua_createtable(std::uintptr_t rL)
 {
-    r_sethvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), r_luaH_new(rL));
-    r_incr_top(rL);
-    return;
+	r_sethvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), r_luaH_new(rL));
+	r_incr_top(rL);
+	return;
 }
 
 std::uint32_t r_lua_yield(std::uintptr_t rL, std::uint32_t nresults) {
 
 	if (*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_nccalls) > *reinterpret_cast<std::uintptr_t*>(rL + offsets::l_baseccalls))
-		r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
+		printf("attempt to yield across metamethod/C-call boundary\n");
+		// r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
 
 	*reinterpret_cast<std::uintptr_t*>(rL + offsets::base) = *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) - 16 * nresults;
 	*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_status) = R_LUA_YIELD;
