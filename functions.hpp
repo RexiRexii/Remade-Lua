@@ -436,3 +436,20 @@ void stack_init(const std::uintptr_t rL, const std::uintptr_t L1)
 	if (v106)
 		((void(__cdecl*)(int, int))v106)(v72, v89);
 }
+
+std::uintptr_t r_luaE_newthread(const std::uintptr_t rL)
+{
+	std::uintptr_t L1 = celi_getstate(r_luaM_malloc(rL, celi_statesize(112)));
+	r_luaC_link(rL, L1, R_LUA_TTHREAD);
+	stack_init(rL, L1);
+	celi_getspace(L1);
+	return L1;
+}
+
+std::uintptr_t r_lua_newthread(const std::uintptr_t rL)
+{
+	std::uintptr_t L1 = r_luaE_newthread(rL);
+	r_setthvalue(*(r_TValue**)(rL + offsets::top), L1);
+	r_incr_top(rL);
+	return L1;
+}
