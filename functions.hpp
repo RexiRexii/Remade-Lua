@@ -121,11 +121,17 @@ r_lua_Number r_luaL_checknumber(std::uintptr_t rL, std::uint32_t narg) {
 	return d;
 }
 
+std::uint32_t r_lua_type(std::uintptr_t rL, std::uint32_t idx)
+{
+	r_TValue* obj = r_index2adr(rL, idx);
+	return obj == r_luaO_nilobject ? R_LUA_TNONE : obj->tt;
+}
+
 void r_luaL_checktype(std::uintptr_t rL, std::uint32_t narg, std::uint32_t t)
 {
 	if (r_lua_type(rL, narg) != t)
 		printf("Invalid type.\n");
-		// r_luaL_error(rL, "Invalid type.");
+	// r_luaL_error(rL, "Invalid type.");
 }
 
 /* state -> other */
@@ -169,11 +175,6 @@ void r_lua_remove(std::uintptr_t rL, std::uint32_t idx)
 	r_decr_top(rL);
 }
 
-std::uint32_t r_lua_type(std::uintptr_t rL, std::uint32_t idx)
-{
-	r_TValue* obj = r_index2adr(rL, idx);
-	return obj == r_luaO_nilobject ? R_LUA_TNONE : obj->tt;
-}
 
 void r_lua_insert(std::uintptr_t rL, std::uint32_t idx)
 {
@@ -285,7 +286,7 @@ std::uint32_t r_lua_yield(std::uintptr_t rL, std::uint32_t nresults) {
 
 	if (*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_nccalls) > *reinterpret_cast<std::uintptr_t*>(rL + offsets::l_baseccalls))
 		printf("attempt to yield across metamethod/C-call boundary\n");
-		// r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
+	// r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
 
 	*reinterpret_cast<std::uintptr_t*>(rL + offsets::base) = *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) - 16 * nresults;
 	*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_status) = R_LUA_YIELD;
@@ -439,7 +440,7 @@ void stack_init(const std::uintptr_t rL, const std::uintptr_t L1)
 
 std::uintptr_t r_luaE_newthread(const std::uintptr_t rL)
 {
-	std::uintptr_t L1 = celi_getstate(r_luaM_malloc(rL, celi_statesize(112)));
+	std::uintptr_t L1 = celi_getstate(r_luaM_realloc_(rL, 0, celi_statesize(112), 0));
 	r_luaC_link(rL, L1, R_LUA_TTHREAD);
 	stack_init(rL, L1);
 	celi_getspace(L1);
