@@ -17,10 +17,9 @@ typedef BYTE _BYTE;
 
 struct r_GCheader
 {
-	r_GCObject* next;
-	r_lu_byte tt;
-	r_lu_byte marked;
-	r_lu_byte _pad;
+	BYTE tt;
+	BYTE marked;
+	BYTE _pad;
 };
 
 union r_GCObject
@@ -40,14 +39,14 @@ typedef union
 	r_GCObject* gc;
 	void* p;
 	std::double_t n;
-	std::uint32_t b;
+	int b;
 } r_Value;
 
 typedef struct r_lua_TValue
 {
 	r_Value value;
 	r_lua_TValue* ptr;
-	std::uint32_t tt;
+	int tt;
 } r_TValue;
 
 typedef r_TValue* r_StkId;
