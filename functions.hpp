@@ -330,6 +330,40 @@ void* r_luaM_new_(std::uintptr_t rL, std::size_t nsize, std::uint8_t memcat)
 	return result;
 }
 
+std::uintptr_t r_luaF_newCclosure(const std::uintptr_t rL, const std::uint32_t nelems, const std::uintptr_t e)
+{
+	const auto c = reinterpret_cast<std::int32_t>(r_luaM_new_(rL, 40, 0)); // 40 is the size of a C closure
+	r_luaC_link(rL, c, R_LUA_TFUNCTION);
+
+	*reinterpret_cast<std::uintptr_t*>(c + closure_isc) = 1; // c->isC = true
+	*reinterpret_cast<std::uintptr_t*>(c + closure_env) = e; // c->env
+	*reinterpret_cast<BYTE*>(c + closure_memcat) = *reinterpret_cast<BYTE*>(e + closure_nupvalues); // stupid shit psuedocode stuff
+	*reinterpret_cast<std::uintptr_t*>(c + closure_preload) = 0; // c->preload
+
+	*reinterpret_cast<std::uintptr_t*>(c + c_closure_f) = nelems ^ (c + c_closure_f); // c->c.env
+	*reinterpret_cast<std::uintptr_t*>(c + c_closure_cont) = -(c + c_closure_cont); // c->c.cont
+	*reinterpret_cast<std::uintptr_t*>(c + c_closure_debugname) = c + c_closure_debugname; // c->c.debugname
+
+	return c;
+}
+
+void r_lua_pushcclosure(const std::uintptr_t rL, const std::uintptr_t fn, std::uint32_t nup)
+{
+	const auto cl = r_luaF_newCclosure(rL, nup, *reinterpret_cast<const std::uintptr_t*>(r_index2adr(rL, -10001)));
+
+	const auto nupvalue = *reinterpret_cast<r_TValue**>(rL + lua_state_top) -= nup;
+	const auto upvalue = reinterpret_cast<const void*>((cl + c_closure_upvals) + (nup * sizeof(r_TValue)));
+
+	*reinterpret_cast<std::uintptr_t*>(cl + c_closure_f) = fn; // cl->c.f = fn;
+
+	while (nup--)
+		r_setobj2s(upvalue, nupvalue);
+
+	r_setclvalue(*reinterpret_cast<r_TValue**>(rL + lua_state_top), cl);
+	r_incr_top(rL);
+	return;
+}
+
 std::uint32_t* r_luaH_new(const std::uintptr_t rL)
 {
 	auto t = reinterpret_cast<std::uintptr_t*>(r_luaM_new_(rL, 36u, *reinterpret_cast<BYTE*>(rL + offsets::l_activememcat)));
