@@ -332,7 +332,7 @@ void* r_luaM_new_(std::uintptr_t rL, std::size_t nsize, std::uint8_t memcat)
 
 std::uintptr_t r_luaF_newCclosure(const std::uintptr_t rL, const std::uint32_t nelems, const std::uintptr_t e)
 {
-	const auto c = reinterpret_cast<std::int32_t>(r_luaM_new_(rL, 40, 0)); // 40 is the size of a C closure
+	const auto c = reinterpret_cast<std::int32_t>(r_luaM_new_(rL, 40 + (nelems * sizeof(r_TValue)));  // 40 is the size of a C closure
 	r_luaC_link(rL, c, R_LUA_TFUNCTION);
 
 	*reinterpret_cast<std::uintptr_t*>(c + closure_isc) = 1; // c->isC = true
