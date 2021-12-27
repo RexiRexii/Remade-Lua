@@ -302,37 +302,21 @@ void r_luaC_link(std::uintptr_t rL, std::uint32_t o, r_lu_byte tt)
 	*reinterpret_cast<r_lu_byte*>(o + offsets::g_ttype) = tt;
 }
 
-void* r_luaM_realloc_(std::uintptr_t rL, std::size_t osize, std::size_t nsize, std::uint8_t memcat)
+void* r_luaM_realloc_(std::uintptr_t rL, std::size_t nsize, std::uint8_t memcat)
 {
-	const auto g = r_G(rL);
+	auto GL = r_G(rL);
 	void* result;
-	result = (std::uintptr_t*)(*(std::uint32_t(__cdecl**)(std::uint32_t, std::uintptr_t, std::uintptr_t, std::uintptr_t, std::uint32_t))(g + 12))(rL, *reinterpret_cast<std::uintptr_t*>(g + 16), 0, osize, nsize);
 
-	if (result == NULL && nsize > 0)
-		throw std::exception("not enough memory");
+	result = (std::uintptr_t*)(*(std::uint32_t(__cdecl**)(std::uint32_t, const std::uintptr_t, const std::uintptr_t, const std::uintptr_t, std::uint32_t))(GL + offsets::g_frealloc))(rL, *reinterpret_cast<const std::uintptr_t*>(GL + 16), 0, 0, nsize);
 
-	*reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) = (*reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) - osize) + nsize;
-	*reinterpret_cast<std::uintptr_t*>(g + 4 * memcat + 200) += nsize - osize;
-	return result;
-}
-
-void* r_luaM_new_(std::uintptr_t rL, std::size_t nsize, std::uint8_t memcat)
-{
-	const auto g = r_G(rL);
-	void* result;
-	result = (std::uintptr_t*)(*(std::uint32_t(__cdecl**)(std::uint32_t, std::uintptr_t, std::uintptr_t, std::uintptr_t, std::uint32_t))(g + offsets::g_frealloc))(rL, *reinterpret_cast<std::uintptr_t*>(g + 16), 0, 0, nsize);
-
-	if (result == NULL && nsize > 0)
-		throw std::exception("not enough memory");
-
-	*reinterpret_cast<std::size_t*>(g + offsets::g_totalbytes) += nsize;
-	*reinterpret_cast<std::uintptr_t*>(g + 4 * memcat + 200) += nsize;
+	*reinterpret_cast<std::size_t*>(GL + offsets::g_totalbytes) = (*reinterpret_cast<size_t*>(GL + offsets::g_totalbytes) - osize) + nsize;
+	*reinterpret_cast<std::uintptr_t*>(GL + 4 * memcat + 200) += nsize - osize;
 	return result;
 }
 
 std::uintptr_t r_luaF_newCclosure(const std::uintptr_t rL, const std::uint32_t nelems, const std::uintptr_t e)
 {
-	const auto c = reinterpret_cast<std::int32_t>(operator new(40 + (nelems * sizeof(r_TValue)))); // meme
+	const auto c = reinterpret_cast<std::int32_t>(r_luaM_realloc_(rL, 40, *reinterpret_cast<BYTE*>(rL + offsets::l_activememcat))); // meme
 	r_luaC_link(rL, c, R_LUA_TFUNCTION);
 	*reinterpret_cast<std::uint8_t*>(c + closure_isc) = 1;
 	*reinterpret_cast<std::uintptr_t*>(c + closure_env) = e;
@@ -360,7 +344,7 @@ void r_lua_pushcclosure(const std::uintptr_t rL, const std::uintptr_t fn, std::u
 
 std::uint32_t* r_luaH_new(const std::uintptr_t rL)
 {
-	auto t = reinterpret_cast<std::uintptr_t*>(r_luaM_new_(rL, 36u, *reinterpret_cast<BYTE*>(rL + offsets::l_activememcat)));
+	auto t = reinterpret_cast<std::uintptr_t*>(r_luaM_realloc_(rL, 36u, *reinterpret_cast<BYTE*>(rL + offsets::l_activememcat)));
 	r_luaC_link(rL, reinterpret_cast<std::uintptr_t>(t), R_LUA_TTABLE);
 
 	*reinterpret_cast<std::uintptr_t*>(t + offsets::t_metatable) = *reinterpret_cast<std::uintptr_t*>(rL + 12); // requires metatable obfuscation
