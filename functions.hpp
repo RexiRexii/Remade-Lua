@@ -331,13 +331,15 @@ std::uintptr_t r_luaF_newCclosure(const std::uintptr_t rL, const std::uint32_t n
 
 void r_lua_pushcclosure(const std::uintptr_t rL, const std::uintptr_t fn, std::uint32_t nup)
 {
-	const auto cl = r_luaF_newCclosure(rL, nup, *reinterpret_cast<const std::uintptr_t*>(r_index2adr(rL, -10001)));
+	auto cl = r_luaF_newCclosure(rL, nup, *reinterpret_cast<const std::uintptr_t*>(r_index2adr(rL, -10001)));
+
 	const auto nupvalue = *reinterpret_cast<r_TValue**>(rL + lua_state_top) -= nup;
-	const auto upvalue = reinterpret_cast<const void*>((cl + c_closure_upvals) + (nup * sizeof(r_TValue)));
-	*reinterpret_cast<std::uintptr_t*>(cl + c_closure_f) = fn; // cl->c.f = fn;
+	const auto upvalue = reinterpret_cast<void*>((cl + c_closure_upvals) + (16u * nup));
+
 	while (nup--)
-		r_setobj2s(upvalue, nupvalue);
-	r_setclvalue(*reinterpret_cast<r_TValue**>(rL + lua_state_top), cl);
+		*reinterpret_cast<double*>(upvalue) = *reinterpret_cast<const double*>(nupvalue);
+
+	r_setval(rL, R_LUA_TFUNCTION, cl);
 	r_incr_top(rL);
 	return;
 }
