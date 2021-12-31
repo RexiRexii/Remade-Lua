@@ -302,7 +302,7 @@ void r_luaC_link(std::uintptr_t rL, std::uint32_t o, r_lu_byte tt)
 	*reinterpret_cast<r_lu_byte*>(o + offsets::g_ttype) = tt;
 }
 
-void* r_luaM_realloc_(std::uintptr_t rL, std::size_t nsize, std::uint8_t memcat)
+void* r_luaM_realloc_(std::uintptr_t rL, std::size_t, osize, std::size_t nsize, std::uint8_t memcat)
 {
 	auto GL = r_G(rL);
 	void* result;
@@ -311,6 +311,7 @@ void* r_luaM_realloc_(std::uintptr_t rL, std::size_t nsize, std::uint8_t memcat)
 
 	*reinterpret_cast<std::size_t*>(GL + offsets::g_totalbytes) = (*reinterpret_cast<size_t*>(GL + offsets::g_totalbytes) - osize) + nsize;
 	*reinterpret_cast<std::uintptr_t*>(GL + 4 * memcat + 200) += nsize - osize;
+
 	return result;
 }
 
