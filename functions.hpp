@@ -67,6 +67,13 @@ __inline std::uintptr_t r_decr_top(const std::uintptr_t a1)
     return *reinterpret_cast<std::uintptr_t*>(a1 + luastate_top) -= sizeof(r_TValue);
 }
 
+__inline void r_setobj2s(r_TValue* obj1, r_TValue* obj2)
+{
+    const r_TValue* o2 = (obj2);
+    r_TValue* o1 = (obj1);
+    *o1 = *o2;
+}
+
 // addresses
 const auto r_luaO_nilobject = aslr(0x3087C80);
 
@@ -126,10 +133,33 @@ __inline void r_lua_settop(const std::uintptr_t rL, const std::int32_t idx)
 __inline void r_lua_pushvalue(const std::uintptr_t rL, const std::int32_t idx)
 {
     const auto o = r_index2addr(rL, idx);
-    const auto top = *reinterpret_cast<const std::uintptr_t*>(rL + luastate_top);
+    const auto top = *reinterpret_cast<r_TValue**>(rL + luastate_top);
 
-    *reinterpret_cast<double*>(top) = *reinterpret_cast<const double*>(o);
+    r_setobj2s(top, o);
     r_incr_top(rL);
+}
+
+__inline void r_lua_pushnil(const std::uintptr_t rL)
+{
+    const auto top = *reinterpret_cast<r_TValue**>(rL + luastate_top);
+    top->tt = R_LUA_TNIL;
+    r_incr_top(rL);
+}
+
+__inline void r_lua_pushnumber(const std::uintptr_t rL, const std::double_t n)
+{
+    r_TValue* i_o = (*reinterpret_cast<r_TValue**>(rL + luastate_top));
+    i_o->value.n = r_xor_double(&(n));
+    i_o->tt = R_LUA_TNUMBER;
+    r_incr_top(rL);
+}
+
+__inline void r_lua_pushinteger(const std::uintptr_t rL, std::int32_t n)
+{
+    r_TValue* i_o = (*reinterpret_cast<r_TValue**>(rL + luastate_top));
+    i_o->value.n = r_xor_double(&*reinterpret_cast<const std::double_t*>(&(n)));
+    i_o->tt = R_LUA_TNUMBER;
+    return;
 }
 
 __inline void r_lua_remove(const std::uintptr_t rL, const std::int32_t idx)
@@ -138,7 +168,7 @@ __inline void r_lua_remove(const std::uintptr_t rL, const std::int32_t idx)
     const auto top = *reinterpret_cast<r_TValue**>(rL + luastate_top);
 
     while (++p < top)
-        *reinterpret_cast<double*>(p - 1) = *reinterpret_cast<const double*>(p);
+        r_setobj2s(p - 1, p);
 
     r_decr_top(rL);
 }
@@ -149,9 +179,9 @@ __inline void r_lua_insert(const std::uintptr_t rL, const std::int32_t idx)
     const auto top = *reinterpret_cast<r_TValue**>(rL + luastate_top);
 
     for (auto q = top; q > p; q--)
-        *reinterpret_cast<double*>(q) = *reinterpret_cast<const double*>(q - 1);
+        r_setobj2s(q, q - 1);
 
-    *reinterpret_cast<double*>(p) = *reinterpret_cast<const double*>(top);
+    r_setobj2s(p, top);
 }
 
 __inline void r_lua_replace(const std::uintptr_t rL, const std::int32_t idx)
@@ -162,7 +192,7 @@ __inline void r_lua_replace(const std::uintptr_t rL, const std::int32_t idx)
     if (idx == -10001)
         throw std::exception("no calling environment");
 
-    *reinterpret_cast<double*>(o) = *reinterpret_cast<const double*>(top - 1);
+    r_setobj2s(o, top - 1);
     r_decr_top(rL);
 }
 
@@ -179,15 +209,6 @@ __inline void r_lua_xmove(const std::uintptr_t from, const std::uintptr_t to, st
 
     *reinterpret_cast<r_TValue**>(from + luastate_top) = ftop;
     *reinterpret_cast<r_TValue**>(to + luastate_top) = ttop + n;
-}
-
-__inline void r_lua_xpush(const std::uintptr_t from, const std::uintptr_t to, std::int32_t idx)
-{
-    const auto top = *reinterpret_cast<std::uintptr_t*>(to + luastate_top);
-    const auto id = r_index2addr(from, idx);
-
-    *reinterpret_cast<double*>(to + top) = *reinterpret_cast<const double*>(id);
-    r_incr_top(to);
 }
 
 /*
