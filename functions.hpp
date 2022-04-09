@@ -1,471 +1,298 @@
-#include "headers.hpp"
-#include <Windows.h>
-#include <exception>
-#include <stdio.h>
+#pragma once
+#include <cstdint>
+#include <emmintrin.h>
+#include <dependencies/roblox/offsets.hpp>
 
-__forceinline r_TValue* r_index2adr(std::uintptr_t rL, std::int32_t idx)
+/* struct */
+struct r_TValue // since iivillian told me using structs is normal, i will use it for *few funcs only*
 {
-	if (idx > 0)
-	{
-		r_TValue* o = *reinterpret_cast<r_TValue**>(rL + offsets::base) + (idx - 1);
+    union
+    {
+        std::uintptr_t gc;
+        void* p;
+        double n;
+        int b;
+        float v[2];
+    } value;
 
-		if (o >= *reinterpret_cast<r_TValue**>(rL + offsets::top))
-			return cast(r_TValue*, r_luaO_nilobject);
-		else
-			return o;
-	}
-	else
-	{
-		return addresses::r_lua_index2adr_slow(rL, idx);
-	}
-}
+    int extra[1];
+    int tt;
+};
 
-/* stack -> push */
-void r_lua_pushnil(std::uintptr_t rL)
+struct r_CallS // for protected call obv
 {
-	r_setnilvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top));
-	r_incr_top(rL);
-}
+    r_TValue* func;
+    int nresults;
+};
 
-void r_lua_pushthread(std::uintptr_t rL)
+// offsets
+const auto luastate_top = 24;
+const auto luastate_base = 12;
+const auto luastate_lg = 8;
+const auto luastate_activememcat = 4;
+
+const auto globalstate_currentwhite = 20;
+const auto globalstate_frealloc = 12;
+const auto globalstate_totalbytes = 56;
+
+const auto closure_isc = 3;
+const auto closure_env = 12;
+const auto closure_preload = 6;
+const auto closure_stacksize = 5;
+const auto closure_upvals = 32;
+const auto closure_nupvals = 4;
+
+const auto closure_debugname = 24;
+const auto closure_f = 16;
+const auto closure_cont = 20;
+
+const auto tvalue_tt = 12;
+
+const auto gch_marked = 2;
+const auto gch_tt = 0;
+const auto gch_memcat = 1;
+
+__inline std::uintptr_t r_G(const std::uintptr_t a1)
 {
-	r_setthvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), rL);
-	r_incr_top(rL);
+    return *reinterpret_cast<const std::uintptr_t*>(a1 + luastate_lg) - (a1 + luastate_lg);
 }
 
-void r_lua_pushboolean(std::uintptr_t rL, bool b)
+__inline std::uintptr_t r_incr_top(const std::uintptr_t a1)
 {
-	r_setbvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), b);
-	r_incr_top(rL);
+    return *reinterpret_cast<std::uintptr_t*>(a1 + luastate_top) += sizeof(r_TValue);
 }
 
-void r_lua_pushnumber(std::uintptr_t rL, std::double_t num)
+__inline std::uintptr_t r_decr_top(const std::uintptr_t a1)
 {
-	r_setnvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), num);
-	r_incr_top(rL);
+    return *reinterpret_cast<std::uintptr_t*>(a1 + luastate_top) -= sizeof(r_TValue);
 }
 
-void r_lua_pushvalue(std::uintptr_t rL, std::uint32_t idx)
+// addresses
+const auto r_luaO_nilobject = aslr(0x3087C80);
+
+const auto pseudo2_address = aslr(0x16D4800);
+const auto r_pseudo2addr = reinterpret_cast<r_TValue*(__fastcall*)(std::uintptr_t, std::int32_t)>(pseudo2_address);
+
+const auto xorconst_address = aslr(0x3014E90);
+__inline std::double_t r_xor_double(const std::double_t* from)
 {
-	r_setobj2s(*reinterpret_cast<r_TValue**>(rL + offsets::top), r_index2adr(rL, idx));
-	r_incr_top(rL);
+    __m128d xmm_key = _mm_load_pd(reinterpret_cast<const std::double_t*>(xorconst_address));
+    __m128d xmm_data = _mm_load_sd(from);
+    __m128d xmm_result = _mm_xor_pd(xmm_key, xmm_data);
+    return _mm_cvtsd_f64(xmm_result);
 }
 
-void r_lua_pushinteger(std::uintptr_t rL, std::uint32_t n)
+/*
+** basic stack manipulation
+*/
+__inline r_TValue* r_index2addr(const std::uintptr_t rL, const std::int32_t idx)
 {
-	r_setnvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), cast_num(n));
-	r_incr_top(rL);
+    if (idx > 0)
+    {
+        const auto o = *reinterpret_cast<r_TValue**>(rL + luastate_base) + ((idx - 1) * sizeof(r_TValue));
+
+        if (o >= *reinterpret_cast<r_TValue**>(rL + luastate_top))
+            *reinterpret_cast<r_TValue**>(r_luaO_nilobject);
+        else
+            return o;
+    }
+    else if (idx > -10000)
+        return *reinterpret_cast<r_TValue**>(rL + luastate_top) + idx;
+    else
+        return r_pseudo2addr(rL, idx);
 }
 
-void r_lua_pushlightuserdata(std::uintptr_t rL, void* p)
+__inline std::uintptr_t r_lua_gettop(const std::uintptr_t rL)
 {
-	r_setpvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), p);
-	r_incr_top(rL);
+    return (*reinterpret_cast<r_TValue**>(rL + luastate_top) - *reinterpret_cast<r_TValue**>(rL + luastate_base)) >> 4;
 }
 
-/* state -> to */
-std::uint32_t* r_lua_tothread(std::uintptr_t rL, std::uint32_t idx)
+__inline void r_lua_settop(const std::uintptr_t rL, const std::int32_t idx)
 {
-	r_StkId o = r_index2adr(rL, idx);
-	if (o->tt == R_LUA_TTHREAD)
-		return &(o)->value.gc->th;
-	return NULL;
+    auto top = *reinterpret_cast<r_TValue**>(rL + luastate_top);
+    auto base = *reinterpret_cast<r_TValue**>(rL + luastate_base);
+
+    if (idx >= 0)
+    {
+        while (top < base + idx)
+            top->tt = R_LUA_TNIL;
+
+        top = base + idx;
+    }
+    else
+        top += idx + 1; /* `subtract' index (index is negative) */
 }
 
-std::double_t r_lua_tonumber(std::uintptr_t rL, std::int32_t idx)
+__inline void r_lua_pushvalue(const std::uintptr_t rL, const std::int32_t idx)
 {
-	r_TValue* top = r_index2adr(rL, idx);
+    const auto o = r_index2addr(rL, idx);
+    const auto top = *reinterpret_cast<const std::uintptr_t*>(rL + luastate_top);
 
-	std::double_t raw_value = *reinterpret_cast<std::double_t*>(&reinterpret_cast<r_TValue*>(top)->value);
-	return r_xor_number(raw_value);
+    *reinterpret_cast<double*>(top) = *reinterpret_cast<const double*>(o);
+    r_incr_top(rL);
 }
 
-std::uint32_t r_lua_tointeger(std::uintptr_t rL, std::uint32_t idx)
+__inline void r_lua_remove(const std::uintptr_t rL, const std::int32_t idx)
 {
-	r_TValue* top = r_index2adr(rL, idx);
+    auto p = r_index2addr(rL, idx);
+    const auto top = *reinterpret_cast<r_TValue**>(rL + luastate_top);
 
-	const std::double_t raw_value = *reinterpret_cast<std::double_t*>(&(reinterpret_cast<r_TValue*>(top))->value);
-	const auto result = static_cast<std::int32_t>(floor(r_xor_number(raw_value)));
-	return result;
+    while (++p < top)
+        *reinterpret_cast<double*>(p - 1) = *reinterpret_cast<const double*>(p);
+
+    r_decr_top(rL);
 }
 
-bool r_lua_toboolean(std::uintptr_t rL, std::uint32_t idx)
+__inline void r_lua_insert(const std::uintptr_t rL, const std::int32_t idx)
 {
-	r_TValue* top = r_index2adr(rL, idx);
-	return reinterpret_cast<r_TValue*>(top)->value.b;
+    const auto p = r_index2addr(rL, idx);
+    const auto top = *reinterpret_cast<r_TValue**>(rL + luastate_top);
+
+    for (auto q = top; q > p; q--)
+        *reinterpret_cast<double*>(q) = *reinterpret_cast<const double*>(q - 1);
+
+    *reinterpret_cast<double*>(p) = *reinterpret_cast<const double*>(top);
 }
 
-const char* r_lua_tolstring(std::uintptr_t rL, std::uint32_t idx, std::size_t* len)
+__inline void r_lua_replace(const std::uintptr_t rL, const std::int32_t idx)
 {
-	r_StkId o = r_index2adr(rL, idx);
-	if (!r_ttisstring(o))
-	{
-		if (!addresses::r_luaV_tostring(rL, o))
-		{ /* conversion failed? */
-			if (len != NULL)
-				*len = 0;
-			return NULL;
-		}
-		o = r_index2adr(rL, idx); /* previous call may reallocate the stack */
-	}
-	if (len != NULL)
-		*len = obfuscations::deobf_tstring_len(reinterpret_cast<std::uintptr_t>(o->value.gc));
-	return r_getstr(o->value.gc);
+    const auto o = r_index2addr(rL, idx);
+    const auto top = *reinterpret_cast<r_TValue**>(rL + luastate_top);
+
+    if (idx == -10001)
+        throw std::exception("no calling environment");
+
+    *reinterpret_cast<double*>(o) = *reinterpret_cast<const double*>(top - 1);
+    r_decr_top(rL);
 }
 
-/* luaL */
-r_lua_Number r_luaL_checknumber(std::uintptr_t rL, std::uint32_t narg) {
-	r_lua_Number d = r_lua_tonumber(rL, narg);
-	if (d == 0)  /* avoid extra test when d is not 0 */
-		printf("bruh moment in checknumber\n");
-	return d;
-}
-
-std::uint32_t r_lua_type(std::uintptr_t rL, std::uint32_t idx)
+__inline void r_lua_xmove(const std::uintptr_t from, const std::uintptr_t to, std::int32_t n)
 {
-	r_TValue* obj = r_index2adr(rL, idx);
-	return obj == r_luaO_nilobject ? R_LUA_TNONE : obj->tt;
+    if (from == to)
+        return;
+
+    const auto ttop = *reinterpret_cast<r_TValue**>(to + luastate_top);
+    const auto ftop = *reinterpret_cast<r_TValue**>(from + luastate_top) - n;
+
+    for (auto i = 0; i < n; i++)
+        *reinterpret_cast<double*>(ttop + i) = *reinterpret_cast<const double*>(ftop + i);
+
+    *reinterpret_cast<r_TValue**>(from + luastate_top) = ftop;
+    *reinterpret_cast<r_TValue**>(to + luastate_top) = ttop + n;
 }
 
-void r_luaL_checktype(std::uintptr_t rL, std::uint32_t narg, std::uint32_t t)
+__inline void r_lua_xpush(const std::uintptr_t from, const std::uintptr_t to, std::int32_t idx)
 {
-	if (r_lua_type(rL, narg) != t)
-		printf("Invalid type.\n");
-	// r_luaL_error(rL, "Invalid type.");
+    const auto top = *reinterpret_cast<std::uintptr_t*>(to + luastate_top);
+    const auto id = r_index2addr(from, idx);
+
+    *reinterpret_cast<double*>(to + top) = *reinterpret_cast<const double*>(id);
+    r_incr_top(to);
 }
 
-/* state -> other */
-void r_lua_xmove(std::uintptr_t from, std::uintptr_t to, std::uint32_t n)
+/*
+** access functions (stack -> C)
+*/
+__inline std::int32_t r_lua_type(const std::uintptr_t rL, const std::int32_t idx)
 {
-	if (from == to) return;
-	*reinterpret_cast<std::uintptr_t*>(from + offsets::top) -= (n * sizeof(r_TValue));
+    const auto o = r_index2addr(rL, idx);
 
-	for (auto i = 0; i < n; i++)
-	{
-		r_setobj2s(*reinterpret_cast<r_TValue**>(to + offsets::top), *reinterpret_cast<r_TValue**>(from + offsets::top) + i);
-		r_incr_top(to);
-	}
-	return;
+    return (o == *reinterpret_cast<r_TValue**>(r_luaO_nilobject)) ? R_LUA_TNONE : o->tt;
 }
 
-void r_lua_replace(std::uintptr_t rL, std::uint32_t idx)
+__inline std::double_t r_lua_tonumber(const std::uintptr_t rL, const std::int32_t idx)
 {
-	auto o = r_index2adr(rL, idx);
+    auto top = r_index2addr(rL, idx);
 
-	if (idx == R_LUA_ENVIRONINDEX)
-	{
-		//	r_luaL_error(rL, "no calling environment");
-		printf("no calling environment\n"); // use r_luaL_error if you want
-	}
+    const auto value = *reinterpret_cast<const std::double_t*>(&(reinterpret_cast<r_TValue*>(top)->value));
+    const auto result = r_xor_double(&(value));
 
-	r_setobj2s(reinterpret_cast<r_TValue*>(o), reinterpret_cast<r_TValue*>(r_index2adr(rL, -1)));
-	r_decr_top(rL);
+    if (result == 0)
+        throw std::exception("value is nil");
+
+    return result;
 }
 
-void r_lua_remove(std::uintptr_t rL, std::uint32_t idx)
+__inline std::int32_t r_lua_tointeger(const std::uintptr_t rL, const std::int32_t idx)
 {
-	auto p = r_index2adr(rL, idx);
+    auto top = r_index2addr(rL, idx);
 
-	while (p < *reinterpret_cast<r_TValue**>(rL + offsets::top))
-	{
-		r_setobj2s(reinterpret_cast<r_TValue*>(p), reinterpret_cast<r_TValue*>(p + sizeof(r_TValue)));
-		p += sizeof(r_TValue);
-	}
+    const auto value = *reinterpret_cast<const std::double_t*>(&(reinterpret_cast<r_TValue*>(top)->value));
+    const auto result = static_cast<const std::int32_t>(std::floor(r_xor_double(&(value))));
+    // std::floor = returns integer value, perfect for what we need it for!
+    
+    if (result == 0)
+        throw std::exception("value is nil");
 
-	r_decr_top(rL);
+    return result;
 }
 
-
-void r_lua_insert(std::uintptr_t rL, std::uint32_t idx)
+__inline bool r_lua_toboolean(const std::uintptr_t rL, const std::int32_t idx)
 {
-	auto p = r_index2adr(rL, idx);
-	for (auto q = *reinterpret_cast<r_TValue**>(rL + offsets::top); q > p; q -= sizeof(r_TValue))
-	{
-		r_setobj2s(reinterpret_cast<r_TValue*>(q), reinterpret_cast<r_TValue*>(q - sizeof(r_TValue)));
-	}
+    auto top = r_index2addr(rL, idx);
+    const auto result = reinterpret_cast<r_TValue*>(top)->value.b; // wow! even tho I could simply do this without the struct, I chose to use it! Little difference wouldnt hurt ;)
 
-	r_setobj2s(reinterpret_cast<r_TValue*>(p), *reinterpret_cast<r_TValue**>(rL + offsets::top));
+    if (result == 0)
+        throw std::exception("value is nil");
+
+    return result;
 }
 
-std::uint32_t r_lua_gettop(std::uintptr_t rL)
+__inline void* r_lua_touserdata(const std::uintptr_t rL, const std::int32_t idx)
 {
-	return cast_int(*reinterpret_cast<r_TValue**>(rL + offsets::top) - *reinterpret_cast<r_TValue**>(rL + offsets::base));
+    const auto o = r_index2addr(rL, idx);
+
+    switch (o->tt)
+    {
+    case R_LUA_TLIGHTUSERDATA:
+        return *reinterpret_cast<void**>(o);
+    case R_LUA_TUSERDATA:
+        return reinterpret_cast<void*>(*reinterpret_cast<const std::uintptr_t*>(o) + 16u);
+    default:
+        return 0;
+    }
 }
 
-void r_lua_settop(std::uintptr_t rL, std::uint32_t idx)
+__inline std::int32_t r_luaD_call(const std::uintptr_t rL, r_TValue* func, const std::int32_t nresults)
 {
-	r_TValue** top = reinterpret_cast<r_TValue**>(rL + offsets::top);
-	r_TValue** base = reinterpret_cast<r_TValue**>(rL + offsets::base);
-	if (idx >= 0)
-	{
-		while (*top < *base + idx)
-		{
-			r_setnilvalue(*top);
-			*top++;
-		}
-		*top = *base + idx;
-	}
-	else
-		*top += idx + 1;
+    const auto ptr = std::make_unique<r_CallS>();
+    const auto ud = ptr.get();
+
+    ud->func = func;
+    ud->nresults = nresults;
+
+    std::int32_t result = 0;
+
+    __asm
+    {
+        push edx;
+        push eax;
+        push ecx;
+
+        mov edx, [luad_precall_address];
+        mov ecx, [rL];
+        mov eax, [ud];
+        push eax;
+        call[luad_rawrunprotected_address];
+        mov[result], eax;
+        add esp, 4;
+
+        pop ecx;
+        pop eax;
+        pop edx;
+    }
+    return result;
 }
 
-void r_lua_pushraw(std::uintptr_t rL, std::uintptr_t obj, int tt)
+__inline void r_lua_call(const std::uintptr_t rL, const std::int32_t nargs, const std::int32_t nresults)
 {
-	r_setrawobj2s(rL, obj, tt);
-	r_incr_top(rL);
+    auto func = *reinterpret_cast<r_TValue**>(rL + luastate_top) - (nargs + 1);
+
+    r_luaD_call(rL, func, nresults);
 }
 
-std::uint32_t r_lua_getmetatable(std::uintptr_t rL, std::uint32_t idx)
+__inline void r_f_call(const std::uintptr_t rL, void* ud)
 {
-	const r_TValue* obj;
-	auto mt = 0;
-	std::uintptr_t res;
-	obj = r_index2adr(rL, idx);
-
-	switch (r_ttype(obj))
-	{
-	case R_LUA_TTABLE:
-	{
-		std::uintptr_t v5 = *(DWORD*)obj + 24;
-		mt = *(_DWORD*)v5 + 12;
-		break;
-	}
-	case R_LUA_TUSERDATA:
-	{
-		std::uintptr_t v6 = *(DWORD*)obj + 12;
-		mt = v6 ^ *(DWORD*)v6;
-		break;
-	}
-	default:
-	{
-		mt = *(DWORD*)(4 * *(DWORD*)(obj + 12) + 1304 - (rL + 20) + *(DWORD*)(rL + 20));
-		break;
-	}
-	}
-	if (mt == NULL)
-		res = 0;
-	else
-	{
-		r_lua_pushraw(rL, mt, R_LUA_TTABLE);
-		res = 1;
-	}
-	return res;
-}
-
-std::uint32_t r_lua_setmetatable(std::uintptr_t rL, std::int32_t objindex) // didnt check if this actually works, will remove this comment when i confirm it does
-{
-	const r_TValue* obj;
-	auto mt = 0;
-	obj = r_index2adr(rL, objindex);
-
-	switch (r_ttype(obj))
-	{
-	case R_LUA_TTABLE:
-	{
-		std::uintptr_t v5 = *(DWORD*)obj + 24;
-		*(_DWORD*)v5 + 12 == mt;
-		break;
-	}
-	case R_LUA_TUSERDATA:
-	{
-		std::uintptr_t v6 = *(DWORD*)obj + 12;
-		v6^* (_DWORD*)v6 == mt;
-		break;
-	}
-	default:
-	{
-		*(DWORD*)(4 * *(DWORD*)(obj + 12) + 1304 - (rL + 20) + *(DWORD*)(rL + 20)) = mt;
-		break;
-	}
-	}
-	r_decr_top(rL);
-	return 1;
-}
-
-std::uint32_t r_lua_yield(std::uintptr_t rL, std::uint32_t nresults) {
-
-	if (*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_nccalls) > *reinterpret_cast<std::uintptr_t*>(rL + offsets::l_baseccalls))
-		printf("attempt to yield across metamethod/C-call boundary\n");
-	// r_luaL_error(rL, "attempt to yield across metamethod/C-call boundary");
-
-	*reinterpret_cast<std::uintptr_t*>(rL + offsets::base) = *reinterpret_cast<std::uintptr_t*>(rL + offsets::top) - 16 * nresults;
-	*reinterpret_cast<std::uintptr_t*>(rL + offsets::l_status) = R_LUA_YIELD;
-	return -1;
-}
-
-void r_luaC_link(std::uintptr_t rL, std::uint32_t o, r_lu_byte tt)
-{
-	const auto g = r_G(rL); // getglobalstate
-	*reinterpret_cast<std::uint32_t*>(o) = *reinterpret_cast<std::uint32_t*>(g + offsets::g_next);
-	*reinterpret_cast<std::uint32_t*>(g + offsets::g_rootgc) = o;
-	*reinterpret_cast<r_lu_byte*>(o + offsets::g_marked) = *reinterpret_cast<r_lu_byte*>(g + offsets::g_currentwhite) & 3;
-	*reinterpret_cast<r_lu_byte*>(o + offsets::g_ttype) = tt;
-}
-
-void* r_luaM_realloc_(std::uintptr_t rL, std::size_t, osize, std::size_t nsize, std::uint8_t memcat)
-{
-	auto GL = r_G(rL);
-	void* result;
-
-	result = (std::uintptr_t*)(*(std::uint32_t(__cdecl**)(std::uint32_t, const std::uintptr_t, const std::uintptr_t, const std::uintptr_t, std::uint32_t))(GL + offsets::g_frealloc))(rL, *reinterpret_cast<const std::uintptr_t*>(GL + 16), 0, 0, nsize);
-
-	*reinterpret_cast<std::size_t*>(GL + offsets::g_totalbytes) = (*reinterpret_cast<size_t*>(GL + offsets::g_totalbytes) - osize) + nsize;
-	*reinterpret_cast<std::uintptr_t*>(GL + 4 * memcat + 200) += nsize - osize;
-
-	return result;
-}
-
-std::uintptr_t r_luaF_newCclosure(const std::uintptr_t rL, const std::uint32_t nelems, const std::uintptr_t e)
-{
-	const auto c = reinterpret_cast<std::int32_t>(r_luaM_realloc_(rL, 40, *reinterpret_cast<BYTE*>(rL + offsets::l_activememcat))); // meme
-	r_luaC_link(rL, c, R_LUA_TFUNCTION);
-	*reinterpret_cast<std::uint8_t*>(c + closure_isc) = 1;
-	*reinterpret_cast<std::uintptr_t*>(c + closure_env) = e;
-	*reinterpret_cast<std::uint8_t*>(c + closure_nupvalues) = nelems;
-	*reinterpret_cast<std::uint8_t*>(c + closure_stacksize) = 20;
-	*reinterpret_cast<std::uint8_t*>(c + closure_preload) = 0;
-	*reinterpret_cast<std::uintptr_t*>(c + c_closure_f) = -(c + c_closure_f);
-	*reinterpret_cast<std::uintptr_t*>(c + c_closure_cont) = (c + c_closure_cont);
-	*reinterpret_cast<std::uintptr_t*>(c + c_closure_debugname) = (c + c_closure_debugname);
-	return c;
-}
-
-void r_lua_pushcclosure(const std::uintptr_t rL, const std::uintptr_t fn, std::uint32_t nup)
-{
-	auto cl = r_luaF_newCclosure(rL, nup, *reinterpret_cast<const std::uintptr_t*>(r_index2adr(rL, -10001)));
-
-	const auto nupvalue = *reinterpret_cast<r_TValue**>(rL + lua_state_top) -= nup;
-	const auto upvalue = reinterpret_cast<void*>((cl + c_closure_upvals) + (16u * nup));
-
-	while (nup--)
-		*reinterpret_cast<double*>(upvalue) = *reinterpret_cast<const double*>(nupvalue);
-
-	r_setval(rL, R_LUA_TFUNCTION, cl);
-	r_incr_top(rL);
-	return;
-}
-
-std::uint32_t* r_luaH_new(const std::uintptr_t rL)
-{
-	auto t = reinterpret_cast<std::uintptr_t*>(r_luaM_realloc_(rL, 36u, *reinterpret_cast<BYTE*>(rL + offsets::l_activememcat)));
-	r_luaC_link(rL, reinterpret_cast<std::uintptr_t>(t), R_LUA_TTABLE);
-
-	*reinterpret_cast<std::uintptr_t*>(t + offsets::t_metatable) = *reinterpret_cast<std::uintptr_t*>(rL + 12); // requires metatable obfuscation
-	*reinterpret_cast<std::uint8_t*>(t + offsets::t_flags) = 0;
-	*reinterpret_cast<std::uintptr_t*>(t + offsets::t_array_) = 0;
-	*reinterpret_cast<std::uintptr_t*>(t + offsets::t_sizearray) = 0;
-	*reinterpret_cast<std::uint8_t*>(t + offsets::t_lsizenode) = 0;
-	*reinterpret_cast<std::uint8_t*>(t + offsets::t_readonly) = 0;
-	*reinterpret_cast<std::uint8_t*>(t + offsets::t_safeenv) = 0;
-	*reinterpret_cast<std::uint8_t*>(t + offsets::t_nodemask8) = 0;
-
-	return t;
-	// side note: we will never use 2nd and 3rd arg so we just completely remove the use of em
-}
-
-void r_lua_createtable(std::uintptr_t rL)
-{
-	r_sethvalue(*reinterpret_cast<r_TValue**>(rL + offsets::top), r_luaH_new(rL));
-	r_incr_top(rL);
-	return;
-}
-
-/* NEWTHREAD */
-
-void stack_init(const std::uintptr_t rL, const std::uintptr_t L1)
-{
-	std::uint32_t v89 = L1;
-	std::uint32_t v72 = rL;
-
-	auto v94 = *(_DWORD*)(v72 + 20) - (v72 + 20);
-	std::uint32_t v369 = v94;
-	std::uint32_t 	v376 = *(_BYTE*)(v89 + 6);
-
-	std::uint32_t v90 = v369;
-	std::uint32_t v91 = v376;
-	*(_DWORD*)(v369 + 56) += 112;
-	*(_DWORD*)(v90 + 4 * v91 + 200) += 112;
-	std::uint32_t v92 = *(_DWORD*)(v72 + 20) - (v72 + 20);
-	*(_DWORD*)v89 = *(_DWORD*)(v92 + 24);
-	RLOBYTE(v91) = *(_BYTE*)(v92 + 20);
-	*(_DWORD*)(v92 + 24) = v89;
-	*(_BYTE*)(v89 + 4) = v91 & 3;
-	*(_BYTE*)(v89 + 5) = 8;
-	RLOBYTE(v91) = *(_BYTE*)(v72 + 8);
-	*(_BYTE*)(v89 + 6) = v91;
-	v376 = v91;
-	std::uint32_t v93 = *(_DWORD*)(v72 + 20) - (v72 + 20);
-	*(_DWORD*)(v89 + 100) = 0;
-	*(_DWORD*)(v89 + 20) = v89 + 20 + v93;
-	*(_DWORD*)(v89 + 32) = 0;
-	*(_DWORD*)(v89 + 44) = v89 + 44;
-	*(_DWORD*)(v89 + 7) = 0;
-	*(_DWORD*)(v89 + 48) = 0;
-	*(_DWORD*)(v89 + 52) = 0;
-	*(_DWORD*)(v89 + 16) = 0;
-	*(_DWORD*)(v89 + 40) = 0;
-	*(_DWORD*)(v89 + 104) = 0;
-	*(_DWORD*)(v89 + 56) = 0;
-	*(_DWORD*)(v89 + 108) = 0;
-	*(_DWORD*)(v89 + 92) = 0;
-	*(_BYTE*)(v89 + 8) = *(_BYTE*)(v72 + 8);
-	auto v95 = (*(int(__cdecl**)(int, _DWORD, _DWORD, _DWORD, int))(v94 + 12))(v72, *(_DWORD*)(v94 + 16), 0, 0, 192);
-	std::uint32_t v96 = v95;
-	std::uint32_t v97 = v369;
-	std::uint32_t v98 = v376;
-	*(_DWORD*)(v369 + 56) += 192;
-	*(_DWORD*)(v97 + 4 * v98 + 200) += 192;
-	*(_DWORD*)(v89 + 36) = v96 + 168;
-	*(_DWORD*)(v89 + 40) = v96;
-	*(_DWORD*)(v89 + 16) = v96;
-	*(_DWORD*)(v89 + 48) = 8;
-	auto v99 = (*(int(__cdecl**)(int, _DWORD, _DWORD, _DWORD, int))(v369 + 12))(v72, *(_DWORD*)(v369 + 16), 0, 0, 720);
-	std::uint32_t v100 = v369;
-	std::uint32_t v101 = v376;
-	*(_DWORD*)(v369 + 56) += 720;
-	*(_DWORD*)(v100 + 4 * v101 + 200) += 720;
-	std::uint32_t v102 = 0;
-	*(_DWORD*)(v89 + 32) = v99;
-	*(_DWORD*)(v89 + 44) = v89 + 89;
-	do
-	{
-		*(_DWORD*)(v102 + *(_DWORD*)(v89 + 32) + 12) = 0;
-		v102 += 16;
-	} while (v102 < 720);
-	auto v103 = *(_DWORD*)(v89 + 32);
-	*(_DWORD*)(v89 + 24) = v103;
-	*(_DWORD*)(v89 + 28) = v103 + 16 * (*(_DWORD*)(v89 + 44) - (v89 + 44) - 6);
-	**(_DWORD**)(v89 + 16) = v103;
-	*(_DWORD*)(*(_DWORD*)(v89 + 24) + 12) = 0;
-	*(_DWORD*)(v89 + 24) += 16;
-	*(_DWORD*)(*(_DWORD*)(v89 + 16) + 4) = *(_DWORD*)(v89 + 24);
-	auto v104 = *(_DWORD*)(v89 + 16);
-	*(_DWORD*)(v89 + 12) = *(_DWORD*)(v104 + 4);
-	*(_DWORD*)(v104 + 12) = *(_DWORD*)(v89 + 24) + 320;
-	*(_DWORD*)(v89 + 80) = *(_DWORD*)(v72 + 80);
-	*(_BYTE*)(v89 + 10) = *(_BYTE*)(v72 + 10);
-	auto v105 = *(_DWORD*)(v72 + 24);
-	*(_DWORD*)v105 = v89;
-	*(_DWORD*)(v105 + 12) = 8;
-	*(_DWORD*)(v72 + 24) += 16;
-	auto v106 = *(_DWORD*)(*(_DWORD*)(v72 + 20) - (v72 + 20) + 2004);
-	if (v106)
-		((void(__cdecl*)(int, int))v106)(v72, v89);
-}
-
-std::uintptr_t r_luaE_newthread(const std::uintptr_t rL)
-{
-	std::uintptr_t L1 = celi_getstate(r_luaM_realloc_(rL, 0, celi_statesize(112), 0));
-	r_luaC_link(rL, L1, R_LUA_TTHREAD);
-	stack_init(rL, L1);
-	celi_getspace(L1);
-	return L1;
-}
-
-std::uintptr_t r_lua_newthread(const std::uintptr_t rL)
-{
-	std::uintptr_t L1 = r_luaE_newthread(rL);
-	r_setthvalue(*(r_TValue**)(rL + offsets::top), L1);
-	r_incr_top(rL);
-	return L1;
+    auto c = reinterpret_cast<r_CallS*>(ud);
+    r_luaD_call(rL, c->func, c->nresults);
 }
