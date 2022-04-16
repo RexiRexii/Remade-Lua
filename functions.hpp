@@ -4,7 +4,7 @@
 #include <dependencies/roblox/offsets.hpp>
 
 /* struct */
-struct r_TValue // since iivillian told me using structs is normal, i will use it for *few funcs only*
+struct r_TValue
 {
     union
     {
@@ -19,43 +19,15 @@ struct r_TValue // since iivillian told me using structs is normal, i will use i
     int tt;
 };
 
-struct r_CallS // for protected call obv
+struct r_CallS
 {
     r_TValue* func;
     int nresults;
 };
 
 // offsets
-const auto luastate_top = 24;
-const auto luastate_base = 12;
-const auto luastate_lg = 8;
-const auto luastate_activememcat = 4;
-
-const auto globalstate_currentwhite = 20;
-const auto globalstate_frealloc = 12;
-const auto globalstate_totalbytes = 56;
-
-const auto closure_isc = 3;
-const auto closure_env = 12;
-const auto closure_preload = 6;
-const auto closure_stacksize = 5;
-const auto closure_upvals = 32;
-const auto closure_nupvals = 4;
-
-const auto closure_debugname = 24;
-const auto closure_f = 16;
-const auto closure_cont = 20;
-
-const auto tvalue_tt = 12;
-
-const auto gch_marked = 2;
-const auto gch_tt = 0;
-const auto gch_memcat = 1;
-
-__inline std::uintptr_t r_G(const std::uintptr_t a1)
-{
-    return *reinterpret_cast<const std::uintptr_t*>(a1 + luastate_lg) - (a1 + luastate_lg);
-}
+const auto luastate_top = 8;
+const auto luastate_base = 16;
 
 __inline std::uintptr_t r_incr_top(const std::uintptr_t a1)
 {
@@ -75,12 +47,15 @@ __inline void r_setobj2s(r_TValue* obj1, r_TValue* obj2)
 }
 
 // addresses
-const auto r_luaO_nilobject = aslr(0x3087C80);
+const auto r_luaO_nilobject = aslr(0x222D240);
+const auto xorconst_address = aslr(0x2E01520);
+const auto pseudo2_address = aslr(0x171E540);
 
-const auto pseudo2_address = aslr(0x16D4800);
+const auto luad_precall_address = aslr(0x171FD60);
+const auto luad_rawrunprotected_address = aslr(0x1725E00);
+
 const auto r_pseudo2addr = reinterpret_cast<r_TValue*(__fastcall*)(std::uintptr_t, std::int32_t)>(pseudo2_address);
 
-const auto xorconst_address = aslr(0x3014E90);
 __inline std::double_t r_xor_double(const std::double_t* from)
 {
     __m128d xmm_key = _mm_load_pd(reinterpret_cast<const std::double_t*>(xorconst_address));
